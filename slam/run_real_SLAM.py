@@ -125,7 +125,7 @@ def main():
                    sensor_offset=sensorOffset)
 
     # For consistency testing
-    alpha = 0.05
+    alpha = 0.95
     confidence_prob = 1 - alpha
 
     xupd = np.zeros((mK, 3))

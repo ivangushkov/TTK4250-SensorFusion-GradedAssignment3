@@ -124,7 +124,7 @@ def main():
     NEESes = np.zeros((K, 3))
 
     # For consistency testing
-    alpha = 0.05
+    alpha = 0.95
 
     # init
     eta_pred[0] = poseGT[0]  # we start at the correct position for reference
