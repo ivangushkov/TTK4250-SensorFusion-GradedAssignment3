@@ -133,7 +133,7 @@ class EKFSLAM:
         # cov matrix layout:
         # [[P_xx, P_xm],
         # [P_mx, P_mm]]
-        # TODO Why use Fu here? G = [Fu; 0]?
+        # Why use Fu here? G = [Fu; 0], because it has proved to give better results
         P[:3, :3] = Fx@P[:3,:3]@Fx.T + Fu@self.Q@Fu.T   # robot cov prediction
         P[:3, 3:] = Fx@P[:3,3:]                 # robot-map covariance prediction
         P[3:, :3] = P[:3, 3:].T                 # map-robot covariance: transpose of the above
@@ -170,7 +170,7 @@ class EKFSLAM:
         x = eta[0:3]
         # reshape map (2, #landmarks), m[:, j] is the jth landmark
         m = eta[3:].reshape((-1, 2)).T
-        N_lmrk = m.shape[1]
+        numM = m.shape[1]
 
         Rot = rotmat2d(-x[2])
 
@@ -179,11 +179,11 @@ class EKFSLAM:
         sensor_pos = x[:2] + rotmat2d(x[2])@self.sensor_offset
         
         # relative position of landmark to sensor on robot in world frame
-        delta_m    = np.array([m[:,i] - sensor_pos for i in range(N_lmrk)])
+        delta_m    = np.array([m[:,i] - sensor_pos for i in range(numM)])
 
         # predicted measurements in cartesian coordinates, beware sensor offset for VP
         # The list comprehension makes vectors of shape (lmrk, 2), not (2, lmrk) like m
-        zpredcart  = np.array([Rot@delta_m[i,:] for i in range(N_lmrk)])
+        zpredcart  = np.array([Rot@delta_m[i,:] for i in range(numM)])
 
         zpred_r = np.linalg.norm(zpredcart, axis=1)
         zpred_theta = np.arctan2(zpredcart[:,1], zpredcart[:,0])
@@ -214,8 +214,7 @@ class EKFSLAM:
         np.ndarray, shape=(2 * #landmarks, 3 + 2 * #landmarks)
             the jacobian of h wrt. eta.
         """
-        H = solution.EKFSLAM.EKFSLAM.h_jac(self, eta)
-        return H
+        # H = solution.EKFSLAM.EKFSLAM.h_jac(self, eta)
 
         # extract states and map
         x = eta[0:3]
@@ -225,19 +224,20 @@ class EKFSLAM:
         numM = m.shape[1]
 
         Rot = rotmat2d(x[2])
+        sensor_offset = Rot@self.sensor_offset
 
-        # TODO, relative position of landmark to robot in world frame. m - rho that appears in (11.15) and (11.16)
-        delta_m = None
+        # Relative position of landmark to robot in world frame. m - rho that appears in (11.15) and (11.16)
+        delta_m = np.array([m[:,i] - x[:2] for i in range(numM)]).T
 
-        # TODO, (2, #measurements), each measured position in cartesian coordinates like
-        zc = None
+        # (2, #measurements), each measured position in cartesian coordinates like
+        zc = np.array([delta_m[:,i] - sensor_offset for i in range(numM)]).T
         # [x coordinates;
         #  y coordinates]
-
-        zpred = None  # TODO (2, #measurements), predicted measurements, like
+        
+        zpred = self.h(eta).reshape((2,numM), order='F')  # (2, #measurements), predicted measurements, like
         # [ranges;
         #  bearings]
-        zr = None  # TODO, ranges
+        zr = zpred[0,:]  # ranges
 
         Rpihalf = rotmat2d(np.pi / 2)
 
@@ -247,22 +247,32 @@ class EKFSLAM:
 
         # Allocate H and set submatrices as memory views into H
         # You may or may not want to do this like this
-        # TODO, see eq (11.15), (11.16), (11.17)
+        # see eq (11.15), (11.16), (11.17)
         H = np.zeros((2 * numM, 3 + 2 * numM))
         Hx = H[:, :3]  # slice view, setting elements of Hx will set H as well
         Hm = H[:, 3:]  # slice view, setting elements of Hm will set H as well
 
         # proposed way is to go through landmarks one by one
         # preallocate and update this for some speed gain if looping
-        jac_z_cb = -np.eye(2, 3)
+        dzb_dx = np.eye(2, 3)
         for i in range(numM):  # But this whole loop can be vectorized
             ind = 2 * i  # starting postion of the ith landmark into H
             # the inds slice for the ith landmark into H
             inds = slice(ind, ind + 2)
 
-            # TODO: Set H or Hx and Hm here
+            dzb_dx[:,2] = Rpihalf@delta_m[:,i]
+            dnorm_dzb  = zc[:,i].T / zr[i]
+            dangle_dzb = zc[:,i].T @ Rpihalf.T / zr[i]**2
+            Hx[ind,:]     = - dnorm_dzb  @ dzb_dx
+            Hx[ind+1,:]   = - dangle_dzb @ dzb_dx
+            
+            #Hm[ind,inds]   = dnorm_dzb @ Rot.T
+            #Hm[ind+1,inds] = dangle_dzb @ Rot.T
+            Hm[inds,inds] = -Hx[inds,:2]    # TODO Hva faen?
 
         # TODO: You can set some assertions here to make sure that some of the structure in H is correct
+        
+        
         return H
 
     def add_landmarks(
