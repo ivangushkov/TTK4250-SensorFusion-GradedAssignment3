@@ -1,6 +1,6 @@
 from typing import Tuple
 import numpy as np
-from numpy import ndarray
+from numpy import ndarray, sin, cos
 from dataclasses import dataclass, field
 from scipy.linalg import block_diag
 import scipy.linalg as la
@@ -266,9 +266,11 @@ class EKFSLAM:
             Hx[ind,:]     = - dnorm_dzb  @ dzb_dx
             Hx[ind+1,:]   = - dangle_dzb @ dzb_dx
             
-            #Hm[ind,inds]   = dnorm_dzb @ Rot.T
+            #Hm[ind,inds]   = dnorm_dzb @ Rot.T    # TODO Why does not this work?
             #Hm[ind+1,inds] = dangle_dzb @ Rot.T
-            Hm[inds,inds] = -Hx[inds,:2]    # TODO Hva faen?
+            Hm[ind,inds]   = dnorm_dzb           
+            Hm[ind+1,inds] = dangle_dzb
+            #Hm[inds,inds] = -Hx[inds,:2]          # Also working
 
         # TODO: You can set some assertions here to make sure that some of the structure in H is correct
         
@@ -294,10 +296,10 @@ class EKFSLAM:
         Tuple[np.ndarray, np.ndarray], shapes=(3 + 2*(#landmarks + #newlandmarks,), (3 + 2*(#landmarks + #newlandmarks,)*2
             eta with new landmarks appended, and its covariance
         """
-        # TODO replace this with your own code
-        etaadded, Padded = solution.EKFSLAM.EKFSLAM.add_landmarks(
-            self, eta, P, z)
-        return etaadded, Padded
+        
+        # etaadded, Padded = solution.EKFSLAM.EKFSLAM.add_landmarks(
+        #     self, eta, P, z)
+        
 
         n = P.shape[0]
         assert z.ndim == 1, "SLAM.add_landmarks: z must be a 1d array"
@@ -309,36 +311,44 @@ class EKFSLAM:
         Gx = np.empty((numLmk * 2, 3))
         Rall = np.zeros((numLmk * 2, numLmk * 2))
 
-        I2 = np.eye(2)  # Preallocate, used for Gx
-        # For transforming landmark position into world frame
-        sensor_offset_world = rotmat2d(eta[2]) @ self.sensor_offset
+        I2 = np.eye(2)              # Preallocate, used for Gx
+        Gz_template = np.eye(2)     # Preallocate, used for Gz
+        # For finding landmark position in world frame
+        body2world = rotmat2d(eta[2])
+        sensor_pos_world =body2world @ self.sensor_offset + eta[:2]
         sensor_offset_world_der = rotmat2d(
             eta[2] + np.pi / 2) @ self.sensor_offset  # Used in Gx
-
+        
         for j in range(numLmk):
             ind = 2 * j
             inds = slice(ind, ind + 2)
             zj = z[inds]
 
-            rot = None  # TODO, rotmat in Gz
-            # TODO, calculate position of new landmark in world frame
-            lmnew[inds] = None
+            bearing_heading = zj[1] + eta[2]
+            rot_bearing_heading = rotmat2d(bearing_heading)  # rotmat in Gz
+            # calculate position of new landmark in world frame
+            zj_cartesian = zj[0] * np.array([cos(zj[1]), sin(zj[1])])
+            lmnew[inds] = body2world @ zj_cartesian + sensor_pos_world
 
-            Gx[inds, :2] = None  # TODO
-            Gx[inds, 2] = None  # TODO
+            Gx[inds, :2] = I2
+            Gx[inds, 2] = zj[0] * np.array([-sin(bearing_heading), cos(bearing_heading)]) + sensor_offset_world_der
 
-            Gz = None  # TODO
+            Gz_template[1,1] = zj[0]
+            Gz = rot_bearing_heading @ Gz_template
 
-            # TODO, Gz * R * Gz^T, transform measurement covariance from polar to cartesian coordinates
-            Rall[inds, inds] = None
+            # Gz * R * Gz^T, transform measurement covariance from polar to cartesian coordinates
+            Rall[inds, inds] = Gz @ self.R @ Gz.T
 
         assert len(lmnew) % 2 == 0, "SLAM.add_landmark: lmnew not even length"
-        etaadded = None  # TODO, append new landmarks to state vector
-        # TODO, block diagonal of P_new, see problem text in 1g) in graded assignment 3
-        Padded = None
-        Padded[n:, :n] = None  # TODO, top right corner of P_new
-        # TODO, transpose of above. Should yield the same as calcualion, but this enforces symmetry and should be cheaper
-        Padded[:n, n:] = None
+        etaadded = np.append(eta, lmnew)  # append new landmarks to state vector
+        # block diagonal of P_new, see problem text in 1g) in graded assignment 3
+        Padded = block_diag(P, Gx @ P[:3,:3] @ Gx.T + Rall)
+        Padded[:n, n:] = P[:, :3] @ Gx.T      # top right corner of Padded
+        # Transpose of above. Should yield the same as calcualion, but this enforces symmetry and should be cheaper
+        Padded[n:, :n] = Padded[:n, n:].T
+        
+        # etaadded, Padded = solution.EKFSLAM.EKFSLAM.add_landmarks(
+        #     self, eta, P, z)
 
         assert (
             etaadded.shape * 2 == Padded.shape
@@ -349,6 +359,8 @@ class EKFSLAM:
         assert np.all(
             np.linalg.eigvals(Padded) >= 0
         ), "EKFSLAM.add_landmarks: Padded not PSD"
+        
+        
 
         return etaadded, Padded
 
