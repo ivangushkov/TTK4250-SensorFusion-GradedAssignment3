@@ -94,7 +94,7 @@ def main():
     poseGT = simSLAM_ws["poseGT"].T
 
     K = len(z)
-    M = len(landmarks)
+    M = len(landmarks)  # TODO What to use these for?
 
     # %% Initilize
     Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2  # TODO tune
@@ -104,7 +104,9 @@ def main():
     JCBBalphas = np.array([0.001, 0.0001])  # TODO tune
 
     doAsso = True
-
+    
+    doAssoPlot = False
+    playMovie = False
 
 # these can have a large effect on runtime either through the number of landmarks created
 # or by the size of the association search space.
@@ -133,9 +135,7 @@ def main():
 
     # %% Set up plotting
     # plotting
-
-    doAssoPlot = False
-    playMovie = True
+    
     if doAssoPlot:
         figAsso, axAsso = plt.subplots(num=1, clear=True)
 
@@ -149,10 +149,10 @@ def main():
         # Transpose is to stack measurements rowwise
         # z_k = z[k][0].T
 
-        eta_hat[k], P_hat[k], NIS[k], a[k] =  # TODO update
+        eta_hat[k], P_hat[k], NIS[k], a[k] = slam.update(eta_pred[k], P_pred[k], z_k)
 
         if k < K - 1:
-            eta_pred[k + 1], P_pred[k + 1] =  # TODO predict
+            eta_pred[k + 1], P_pred[k + 1] = slam.predict(eta_hat[k], P_hat[k], odometry[k])
 
         assert (
             eta_hat[k].shape[0] == P_hat[k].shape[0]
@@ -169,7 +169,7 @@ def main():
             NISnorm[k] = 1
             CInorm[k].fill(1)
 
-        NEESes[k] =  # TODO, use provided function slam.NEESes
+        NEESes[k] = slam.NEESes(eta_hat[k][:3], P_hat[k][:3,:3], poseGT[k]) # TODO why not look at nees for landmarks?
 
         if doAssoPlot and k > 0:
             axAsso.clear()
