@@ -221,12 +221,13 @@ def main():
     ax2.plot(*poseGT.T[:2], c="r", label="gt")
     ax2.plot(*pose_est.T[:2], c="g", label="est")
     ax2.plot(*ellipse(pose_est[-1, :2], P_hat[N - 1][:2, :2], 5, 200).T, c="g")
-    ax2.set(title="results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
+    ax2.set(title="Results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
     ax2.axis("equal")
     ax2.grid()
     ax2.set_ylabel('[m]')
     ax2.set_xlabel('[m]')
     ax2.legend()
+    fig2.canvas.manager.set_window_title("Tracking results")
 
     # %% Consistency
 
@@ -239,6 +240,7 @@ def main():
     ax3.plot(NISnorm[:N], lw=0.5)
 
     ax3.set_title(f'NIS, {insideCI.mean()*100}% inside CI')
+    fig3.canvas.manager.set_window_title("NIS")
 
     # NEES
 
@@ -260,6 +262,7 @@ def main():
         print(f"ANEES {tag}: {NEES.mean()}")
 
     fig4.tight_layout()
+    fig4.canvas.manager.set_window_title("NEES")
 
     # %% RMSE
 
@@ -282,6 +285,7 @@ def main():
         ax.grid()
 
     fig5.tight_layout()
+    fig5.canvas.manager.set_window_title("RMSE")
 
     # %% Movie time
 
