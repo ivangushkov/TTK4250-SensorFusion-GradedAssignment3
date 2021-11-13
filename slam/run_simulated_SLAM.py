@@ -94,7 +94,7 @@ def main():
     poseGT = simSLAM_ws["poseGT"].T
 
     K = len(z)
-    M = len(landmarks)  # TODO What to use these for?
+    M = len(landmarks)  # TODO What to use this for?
 
     # %% Initilize
     Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2  # TODO tune
@@ -224,6 +224,9 @@ def main():
     ax2.set(title="results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
     ax2.axis("equal")
     ax2.grid()
+    ax2.set_ylabel('[m]')
+    ax2.set_xlabel('[m]')
+    ax2.legend()
 
     # %% Consistency
 
