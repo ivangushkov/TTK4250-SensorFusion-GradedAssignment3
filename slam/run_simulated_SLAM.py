@@ -97,13 +97,13 @@ def main():
     M = len(landmarks)  # TODO What to use this for?
 
     # %% Initilize
-    Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2  # TODO tune
-    R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune
+    Q = np.diag([0.08, 0.08, 0.8 * np.pi / 180]) ** 2  # TODO tune
+    R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2  # TODO tune
 
     # first is for joint compatibility, second is individual
     JCBBalphas = np.array([0.001, 0.0001])  # TODO tune
 
-    doAsso = True
+    doAsso = True 
     
     doAssoPlot = False
     playMovie = False
@@ -135,6 +135,9 @@ def main():
 
     # %% Set up plotting
     # plotting
+    
+    plot_folder = Path(__file__).parents[1].joinpath('plots')
+    plot_folder.mkdir(exist_ok=True)
     
     if doAssoPlot:
         figAsso, axAsso = plt.subplots(num=1, clear=True)
@@ -194,6 +197,9 @@ def main():
     pose_est = np.array([x[:3] for x in eta_hat[:N]])
     lmk_est = [eta_hat_k[3:].reshape(-1, 2) for eta_hat_k in eta_hat]
     lmk_est_final = lmk_est[N - 1]
+    num_lmk_final = lmk_est_final.shape[0]
+    
+    print("Number of final landmark estimates: ", num_lmk_final)
 
     np.set_printoptions(precision=4, linewidth=100)
 
@@ -228,25 +234,29 @@ def main():
     ax2.set_xlabel('[m]')
     ax2.legend()
     fig2.canvas.manager.set_window_title("Tracking results")
+    fig2.savefig(plot_folder.joinpath("Tracking results.pdf"))
 
     # %% Consistency
 
     # NIS
     insideCI = (CInorm[:N, 0] <= NISnorm[:N]) * (NISnorm[:N] <= CInorm[:N, 1])
+    # TODO this is wrong! Also, should ANIS value use NIS or NISnorm?
+    ANIS_CI = np.array(chi2.interval(alpha, 2 * num_lmk_final * N)) / N 
 
     fig3, ax3 = plt.subplots(num=3, clear=True)
     ax3.plot(CInorm[:N, 0], '--')
     ax3.plot(CInorm[:N, 1], '--')
     ax3.plot(NISnorm[:N], lw=0.5)
 
-    ax3.set_title(f'NIS, {insideCI.mean()*100}% inside CI')
+    ax3.set_title(f'NIS, {round(insideCI.mean()*100,1)}% inside CI, ANIS: {round(NISnorm.mean(),2)}, CI: {ANIS_CI.round(2)}')
     fig3.canvas.manager.set_window_title("NIS")
+    fig3.savefig(plot_folder.joinpath("NIS.pdf"))
 
     # NEES
 
     fig4, ax4 = plt.subplots(nrows=3, ncols=1, figsize=(
         7, 5), num=4, clear=True, sharex=True)
-    tags = ['all', 'pos', 'heading']
+    tags = ['All', 'Pos', 'Heading']
     dfs = [3, 2, 1]
 
     for ax, tag, NEES, df in zip(ax4, tags, NEESes.T, dfs):
@@ -255,14 +265,16 @@ def main():
         ax.plot(np.full(N, CI_NEES[1]), '--')
         ax.plot(NEES[:N], lw=0.5)
         insideCI = (CI_NEES[0] <= NEES) * (NEES <= CI_NEES[1])
-        ax.set_title(f'NEES {tag}: {insideCI.mean()*100}% inside CI')
 
         CI_ANEES = np.array(chi2.interval(alpha, df*N)) / N
         print(f"CI ANEES {tag}: {CI_ANEES}")
         print(f"ANEES {tag}: {NEES.mean()}")
+        
+        ax.set_title(f'{tag}:   NEES {round(insideCI.mean()*100,1)}% inside CI,   ANEES: {round(NEES.mean(),2)}, CI: {CI_ANEES.round(2)}')
 
     fig4.tight_layout()
     fig4.canvas.manager.set_window_title("NEES")
+    fig4.savefig(plot_folder.joinpath("NEES.pdf"))
 
     # %% RMSE
 
@@ -280,12 +292,13 @@ def main():
     for ax, err, tag, ylabel, scaling in zip(ax5, errs, tags[1:], ylabels, scalings):
         ax.plot(err*scaling)
         ax.set_title(
-            f"{tag}: RMSE {np.sqrt((err**2).mean())*scaling} {ylabel}")
+            f"{tag}: RMSE {round(np.sqrt((err**2).mean())*scaling,3)} {ylabel}")
         ax.set_ylabel(f"[{ylabel}]")
         ax.grid()
 
     fig5.tight_layout()
     fig5.canvas.manager.set_window_title("RMSE")
+    fig5.savefig(plot_folder.joinpath("RMSE.pdf"))
 
     # %% Movie time
 
