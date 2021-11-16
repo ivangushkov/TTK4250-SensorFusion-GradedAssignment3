@@ -95,15 +95,24 @@ def main():
 
     K = len(z)
     M = len(landmarks)  # TODO What to use this for?
+    
+    # Initial params
+    # Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2 
+    # R = np.diag([0.1, 1 * np.pi / 180]) ** 2 
+    # JCBBalphas = np.array([0.001, 0.0001]) 
 
-    # %% Initilize
-    Q = np.diag([0.08, 0.08, 0.8 * np.pi / 180]) ** 2  # TODO tune
-    R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2  # TODO tune
-
-    # first is for joint compatibility, second is individual
-    JCBBalphas = np.array([0.001, 0.0001])  # TODO tune
+    # Good params
+    Q = np.diag([0.09, 0.09, 0.6 * np.pi / 180]) ** 2 
+    R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2 
+    JCBBalphas = np.array([0.0001, 0.00001]) 
+    
+    # Diverging
+    # Q = np.diag([0.1, 0.1, 0.1 * np.pi / 180]) ** 2 
+    # R = np.diag([0.1, 1 * np.pi / 180]) ** 2 
+    # JCBBalphas = np.array([0.001, 0.0001]) 
 
     doAsso = True 
+    calculate_map_NEES = False
     
     doAssoPlot = False
     playMovie = False
@@ -124,6 +133,12 @@ def main():
     CI = np.zeros((K, 2))
     CInorm = np.zeros((K, 2))
     NEESes = np.zeros((K, 3))
+    NEES_map = np.zeros((K,1))
+    NEESnorm_map = np.zeros((K,1))
+    CI_NEES_map = np.zeros((K,2))
+    CInorm_NEES_map = np.zeros((K,2))
+    num_assos = np.zeros((K,1), dtype=int)
+    num_lmks = np.zeros((K,), dtype=int)
 
     # For consistency testing
     alpha = 0.95
@@ -162,18 +177,26 @@ def main():
         ), "dimensions of mean and covariance do not match"
 
         num_asso = np.count_nonzero(a[k] > -1)
+        num_assos[k] = num_asso
 
         CI[k] = chi2.interval(alpha, 2 * num_asso)
 
         if num_asso > 0:
-            NISnorm[k] = NIS[k] / (2 * num_asso)
-            CInorm[k] = CI[k] / (2 * num_asso)
+            NISnorm[k] = NIS[k] / (num_asso)
+            CInorm[k] = CI[k] / (num_asso)
         else:
             NISnorm[k] = 1
             CInorm[k].fill(1)
 
         NEESes[k] = slam.NEESes(eta_hat[k][:3], P_hat[k][:3,:3], poseGT[k]) # TODO why not look at nees for landmarks?
 
+        num_lmks[k] = (len(eta_hat[k]) - 3) // 2
+        if num_lmks[k] > 0 and calculate_map_NEES: # Not needed in this case, but looks good
+            NEES_map[k] = lmk_NEES(eta_hat[k][3:], P_hat[k][3:,3:], landmarks)
+            NEESnorm_map[k] = NEES_map[k] / num_lmks[k]
+            CI_NEES_map[k] = chi2.interval(alpha, 2 * num_lmks[k])
+            CInorm_NEES_map[k] = CI_NEES_map[k] / num_lmks[k]
+        
         if doAssoPlot and k > 0:
             axAsso.clear()
             axAsso.grid()
@@ -197,9 +220,8 @@ def main():
     pose_est = np.array([x[:3] for x in eta_hat[:N]])
     lmk_est = [eta_hat_k[3:].reshape(-1, 2) for eta_hat_k in eta_hat]
     lmk_est_final = lmk_est[N - 1]
-    num_lmk_final = lmk_est_final.shape[0]
     
-    print("Number of final landmark estimates: ", num_lmk_final)
+    print("Number of final landmark estimates: ", num_lmks[-1])
 
     np.set_printoptions(precision=4, linewidth=100)
 
@@ -224,7 +246,7 @@ def main():
         el = ellipse(lmk_l, rI, 5, 200)
         ax2.plot(*el.T, "b")
 
-    ax2.plot(*poseGT.T[:2], c="r", label="gt")
+    ax2.plot(*poseGT.T[:2,:N], c="r", label="gt")
     ax2.plot(*pose_est.T[:2], c="g", label="est")
     ax2.plot(*ellipse(pose_est[-1, :2], P_hat[N - 1][:2, :2], 5, 200).T, c="g")
     ax2.set(title="Results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
@@ -241,14 +263,16 @@ def main():
     # NIS
     insideCI = (CInorm[:N, 0] <= NISnorm[:N]) * (NISnorm[:N] <= CInorm[:N, 1])
     # TODO is this wrong?
-    ANIS_CI = np.array(chi2.interval(alpha, 2 * num_lmk_final * N)) / (2 * num_lmk_final * N)
+    dof = num_assos.sum()
+    ANIS = NIS.sum() / dof
+    ANIS_CI = np.array(chi2.interval(alpha, 2 * dof * N)) / (dof * N)
 
     fig3, ax3 = plt.subplots(num=3, clear=True)
     ax3.plot(CInorm[:N, 0], '--')
     ax3.plot(CInorm[:N, 1], '--')
     ax3.plot(NISnorm[:N], lw=0.5)
 
-    ax3.set_title(f'NIS, {round(insideCI.mean()*100,1)}% inside CI, ANIS: {round(NISnorm.mean(),2)}, CI: {ANIS_CI.round(2)}')
+    ax3.set_title(f'NIS, {round(insideCI.mean()*100,1)}% inside CI, ANIS: {round(ANIS,4)}, CI: {ANIS_CI.round(4)}')
     fig3.canvas.manager.set_window_title("NIS")
     fig3.savefig(plot_folder.joinpath("NIS.pdf"))
 
@@ -267,8 +291,8 @@ def main():
         insideCI = (CI_NEES[0] <= NEES) * (NEES <= CI_NEES[1])
 
         CI_ANEES = np.array(chi2.interval(alpha, df*N)) / N
-        print(f"CI ANEES {tag}: {CI_ANEES}")
-        print(f"ANEES {tag}: {NEES.mean()}")
+        # print(f"CI ANEES {tag}: {CI_ANEES}")
+        # print(f"ANEES {tag}: {NEES.mean()}")
         
         ax.set_title(f'{tag}:   NEES {round(insideCI.mean()*100,1)}% inside CI,   ANEES: {round(NEES.mean(),2)}, CI: {CI_ANEES.round(2)}')
 
@@ -299,6 +323,23 @@ def main():
     fig5.tight_layout()
     fig5.canvas.manager.set_window_title("RMSE")
     fig5.savefig(plot_folder.joinpath("RMSE.pdf"))
+    
+    # Landmark NEES
+    if calculate_map_NEES:
+        insideCI = (CInorm_NEES_map[:N, 0] <= NEESnorm_map[:N]) * (NEESnorm_map[:N] <= CInorm_NEES_map[:N, 1])
+        # TODO is this wrong?
+        dof = num_lmks.sum()
+        ANEES_map = NEES_map.sum() / dof
+        ANEES_CI_map = np.array(chi2.interval(alpha, 2 * dof * N)) / (dof * N)
+
+        fig6, ax6 = plt.subplots(num=3, clear=True)
+        ax6.plot(CInorm_NEES_map[:N, 0], '--')
+        ax6.plot(CInorm_NEES_map[:N, 1], '--')
+        ax6.plot(NEESnorm_map[:N], lw=0.5)
+
+        ax6.set_title(f'Map NEES, {round(insideCI.mean()*100,1)}% inside CI, ANEES: {round(ANEES_map,4)}, CI: {ANEES_CI_map.round(4)}')
+        fig6.canvas.manager.set_window_title("Map NEES")
+        fig6.savefig(plot_folder.joinpath("Map NEES.pdf"))
 
     # %% Movie time
 
@@ -346,6 +387,36 @@ def main():
     plt.show()
     # %%
 
+def lmk_NEES(
+    lmk_hat: np.ndarray, P_hat_lmk: np.ndarray, lmk_gt: np.ndarray
+) -> float:
+    '''
+    Calculates NEES of landmarks. Estimated lmks are assigned to nearest true lmk.
+    So multiple estimates may be assigned to the same true one.
+    Reassociates estimates and true lmks each time as estimates may move over time.
+    Is perhaps not needed, if so one only needs to perform association on new landmarks.
+    '''
+    
+    assert lmk_hat.size == lmk_hat.shape[0]
+    assert lmk_hat.size % 2 == 0
+    assert lmk_hat.shape * 2 == P_hat_lmk.shape
+    
+    num_lmk_gt = lmk_gt.shape[0]
+    num_lmk_hat = lmk_hat.size // 2
+    lmk_hat = lmk_hat.reshape(num_lmk_hat,2)
+    error = np.zeros_like(lmk_hat)
+    
+    # Find the closest true landmark to each estimate and assume they are associated
+    # TODO consider if this is wierd to do, especially when multiple estimates are assigned to same true lmk
+    for i in range (num_lmk_hat):
+        diff = lmk_gt - np.tile(lmk_hat[i], (num_lmk_gt,1))
+        norms = np.linalg.norm(diff, 2, 1)
+        error[i] = lmk_hat[i] - lmk_gt[norms.argmin()]
+    
+    error = error.ravel()
+    NEES = error @ (np.linalg.solve(P_hat_lmk, error))
+    
+    return NEES
 
 if __name__ == "__main__":
     main()
