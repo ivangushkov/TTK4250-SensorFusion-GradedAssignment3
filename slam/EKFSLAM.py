@@ -6,6 +6,7 @@ from scipy.linalg import block_diag
 import scipy.linalg as la
 from utils import rotmat2d
 from JCBB import JCBB
+# from time import time_ns
 import utils
 import solution
 
@@ -441,7 +442,7 @@ class EKFSLAM:
 
         numLmk = (eta.size - 3) // 2
         assert (len(eta) - 3) % 2 == 0, "EKFSLAM.update: landmark lenght not even"
-
+        
         if numLmk > 0:
             # Prediction and innovation covariance
             zpred = self.h(eta)
@@ -449,7 +450,17 @@ class EKFSLAM:
 
             # Here you can use simply np.kron (a bit slow) to form the big (very big in VP after a while) R,
             # or be smart with indexing and broadcasting (3d indexing into 2d mat) realizing you are adding the same R on all diagonals
-            S = H @ P @ H.T + np.kron(np.eye(numLmk), self.R) # TODO be smart
+            # S = H @ P @ H.T + np.kron(np.eye(numLmk), self.R) # be smart
+            
+            # t = time_ns()
+            n = zpred.size
+            S = H @ P @ H.T
+            row = np.repeat(np.arange(0,n,2),2)
+            rows = np.vstack((row,row+1))
+            cols = np.tile(np.arange(n), (2,1))
+            S[rows,cols] = S[rows,cols] + np.tile(self.R,n//2)
+            # time_us = (time_ns() - t) / 1e3
+            
             assert (
                 S.shape == zpred.shape * 2
             ), "EKFSLAM.update: wrong shape on either S or zpred"
@@ -484,11 +495,11 @@ class EKFSLAM:
                 NIS = v.T @ Sa_inv @ v
 
                 # When tested, remove for speed
-                assert np.allclose(
-                    Pupd, Pupd.T), "EKFSLAM.update: Pupd not symmetric"
-                assert np.all(
-                    np.linalg.eigvals(Pupd) > 0
-                ), "EKFSLAM.update: Pupd not positive definite"
+                # assert np.allclose(
+                #     Pupd, Pupd.T), "EKFSLAM.update: Pupd not symmetric"
+                # assert np.all(
+                #     np.linalg.eigvals(Pupd) > 0
+                # ), "EKFSLAM.update: Pupd not positive definite"
 
         else:  # All measurements are new landmarks,
             a = np.full(z.shape[0], -1)
@@ -507,10 +518,10 @@ class EKFSLAM:
                 z_new = z[z_new_inds]
                 etaupd, Pupd = self.add_landmarks(etaupd, Pupd, z_new)  # add new landmarks.
 
-        assert np.allclose(
-            Pupd, Pupd.T), "EKFSLAM.update: Pupd must be symmetric"
-        assert np.all(np.linalg.eigvals(Pupd) >=
-                      0), "EKFSLAM.update: Pupd must be PSD"
+        # assert np.allclose(
+        #     Pupd, Pupd.T), "EKFSLAM.update: Pupd must be symmetric"
+        # assert np.all(np.linalg.eigvals(Pupd) >=
+        #               0), "EKFSLAM.update: Pupd must be PSD"
 
         return etaupd, Pupd, NIS, a
 
