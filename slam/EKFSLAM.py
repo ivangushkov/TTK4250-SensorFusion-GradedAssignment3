@@ -273,7 +273,7 @@ class EKFSLAM:
             Hm[ind+1,inds] = dangle_dzb
             #Hm[inds,inds] = -Hx[inds,:2]          # Also working
 
-        # TODO: You can set some assertions here to make sure that some of the structure in H is correct
+        # You can set some assertions here to make sure that some of the structure in H is correct
         
         
         return H
@@ -473,7 +473,7 @@ class EKFSLAM:
             if za.shape[0] == 0:
                 etaupd = eta
                 Pupd = P
-                NIS = 1  # TODO: beware this one when analysing consistency.
+                NIS = 2  # TODO: beware this one when analysing consistency.
             else:
                 # Create the associated innovation
                 v = za.ravel() - zpred  # za: 2D -> flat
@@ -481,7 +481,7 @@ class EKFSLAM:
 
                 # Kalman mean update
                 S_cho_factors = la.cho_factor(Sa) # Optional, used in places for S^-1, see scipy.linalg.cho_factor and scipy.linalg.cho_solve
-                Sa_inv = la.cho_solve(S_cho_factors, np.eye(Sa.shape[0]))       # TODO Is this most efficient?
+                Sa_inv = la.cho_solve(S_cho_factors, np.eye(Sa.shape[0]))
                 W = P @ Ha.T @ Sa_inv  # Kalman gain, use S_cho_factors
                 etaupd = eta + W @ v  # Kalman update
 
@@ -489,7 +489,7 @@ class EKFSLAM:
                 jo = -W @ Ha
                 # same as adding Identity mat
                 jo[np.diag_indices(jo.shape[0])] += 1
-                Pupd = jo @ P @ jo.T + W @ np.kron(np.eye(za.size // 2), self.R) @ W.T  # TODO, Kalman update. This is the main workload on VP after speedups, be smart on R
+                Pupd = jo @ P @ jo.T + W @ np.kron(np.eye(za.size // 2), self.R) @ W.T  # Kalman update. This is the main workload on VP after speedups, be smart on R
 
                 # calculate NIS, can use S_cho_factors
                 NIS = v.T @ Sa_inv @ v
@@ -504,7 +504,7 @@ class EKFSLAM:
         else:  # All measurements are new landmarks,
             a = np.full(z.shape[0], -1)
             z = z.flatten()
-            NIS = 1  # TODO: beware this one when analysing consistency.
+            NIS = 2  # TODO: beware this one when analysing consistency.
             etaupd = eta
             Pupd = P
 
@@ -568,7 +568,11 @@ class EKFSLAM:
             NEES_heading = 1.0  # TODO: beware
 
         NEESes = np.array([NEES_all, NEES_pos, NEES_heading])
-        NEESes[np.isnan(NEESes)] = 1.0  # We may divide by zero, # TODO: beware
+        if np.isnan(NEES_all): 
+            NEESes[0] = 3.0
+        if np.isnan(NEES_pos):
+            NEESes[1] = 2.0
+        # NEESes[np.isnan(NEESes)] = 1.0  # We may divide by zero, # TODO: beware
 
         assert np.all(NEESes >= 0), "ESKF.NEES: one or more negative NEESes"
         return NEESes
