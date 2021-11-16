@@ -240,8 +240,8 @@ def main():
 
     # NIS
     insideCI = (CInorm[:N, 0] <= NISnorm[:N]) * (NISnorm[:N] <= CInorm[:N, 1])
-    # TODO this is wrong! Also, should ANIS value use NIS or NISnorm?
-    ANIS_CI = np.array(chi2.interval(alpha, 2 * num_lmk_final * N)) / N 
+    # TODO is this wrong?
+    ANIS_CI = np.array(chi2.interval(alpha, 2 * num_lmk_final * N)) / (2 * num_lmk_final * N)
 
     fig3, ax3 = plt.subplots(num=3, clear=True)
     ax3.plot(CInorm[:N, 0], '--')
