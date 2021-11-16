@@ -125,7 +125,7 @@ def main():
                    sensor_offset=sensorOffset)
 
     # For consistency testing
-    alpha = 0.95
+    alpha = 0.05
     confidence_prob = 1 - alpha
 
     xupd = np.zeros((mK, 3))
@@ -163,10 +163,10 @@ def main():
         odos = np.zeros((K, 3))
         odox = np.zeros((K, 3))
         odox[0] = eta
-
+        P_odo = P.copy()
         for k in range(min(N, K - 1)):
             odos[k + 1] = odometry(speed[k + 1], steering[k + 1], 0.025, car)
-            odox[k + 1], _ = slam.predict(odox[k], P, odos[k + 1])
+            odox[k + 1], _ = slam.predict(odox[k], P_odo, odos[k + 1])
 
     for k in tqdm(range(N)):
         if mk < mK - 1 and timeLsr[mk] <= timeOdo[k + 1]:
