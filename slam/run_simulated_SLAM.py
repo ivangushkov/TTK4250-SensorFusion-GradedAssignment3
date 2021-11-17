@@ -103,14 +103,14 @@ def main():
     # JCBBalphas = np.array([0.001, 0.0001]) 
     
     # Bad map, good tracking
-    Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2 
-    R = np.diag([1, 5 * np.pi / 180]) ** 2 
-    JCBBalphas = np.array([0.00001, 0.0000001])
+    # Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2 
+    # R = np.diag([1, 5 * np.pi / 180]) ** 2 
+    # JCBBalphas = np.array([0.00001, 0.0000001])
 
     # Good params
-    # Q = np.diag([0.09, 0.09, 0.6 * np.pi / 180]) ** 2 
-    # R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2 
-    # JCBBalphas = np.array([0.0001, 0.00001]) 
+    Q = np.diag([0.09, 0.09, 0.6 * np.pi / 180]) ** 2 
+    R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2 
+    JCBBalphas = np.array([1e-4, 1e-5])     # to remove the 2 extra landmarks, use [1e-4, 2e-6]
     
     # Diverging
     # Q = np.diag([0.1, 0.1, 0.1 * np.pi / 180]) ** 2 
@@ -255,7 +255,7 @@ def main():
     ax2.plot(*poseGT.T[:2,:N], c="r", label="gt")
     ax2.plot(*pose_est.T[:2], c="g", label="est")
     ax2.plot(*ellipse(pose_est[-1, :2], P_hat[N - 1][:2, :2], 5, 200).T, c="g")
-    ax2.set(title="Results", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
+    ax2.set(title=f"Results,  landmark estimates: {num_lmks[-1]}", xlim=(mins[0], maxs[0]), ylim=(mins[1], maxs[1]))
     ax2.axis("equal")
     ax2.grid()
     ax2.set_ylabel('[m]')
