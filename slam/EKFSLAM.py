@@ -473,7 +473,7 @@ class EKFSLAM:
             if za.shape[0] == 0:
                 etaupd = eta
                 Pupd = P
-                NIS = 2  # TODO: beware this one when analysing consistency.
+                NIS = 1  # TODO: beware this one when analysing consistency. Should be 2 right??
             else:
                 # Create the associated innovation
                 v = za.ravel() - zpred  # za: 2D -> flat
@@ -490,7 +490,10 @@ class EKFSLAM:
                 # same as adding Identity mat
                 jo[np.diag_indices(jo.shape[0])] += 1
                 Pupd = jo @ P @ jo.T + W @ np.kron(np.eye(za.size // 2), self.R) @ W.T  # Kalman update. This is the main workload on VP after speedups, be smart on R
-
+                # m1,n1 = self.R.shape
+                # m2,n2 = W.shape
+                # Pupd = jo @ P @ jo.T + W @ (W.reshape(m1,m2//m1,n1,n2//n1)*self.R[:,None,:,None]).reshape(m2,n2).T
+                
                 # calculate NIS, can use S_cho_factors
                 NIS = v.T @ Sa_inv @ v
 
@@ -504,7 +507,7 @@ class EKFSLAM:
         else:  # All measurements are new landmarks,
             a = np.full(z.shape[0], -1)
             z = z.flatten()
-            NIS = 2  # TODO: beware this one when analysing consistency.
+            NIS = 1 # TODO: beware this one when analysing consistency. Should be 2 right??
             etaupd = eta
             Pupd = P
 
