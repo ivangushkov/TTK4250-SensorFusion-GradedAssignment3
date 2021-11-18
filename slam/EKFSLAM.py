@@ -266,12 +266,10 @@ class EKFSLAM:
             dangle_dzb = zc[:,i].T @ Rpihalf.T / zr[i]**2
             Hx[ind,:]     = - dnorm_dzb  @ dzb_dx
             Hx[ind+1,:]   = - dangle_dzb @ dzb_dx
-            
-            #Hm[ind,inds]   = dnorm_dzb @ Rot.T    # TODO Why does not this work?
-            #Hm[ind+1,inds] = dangle_dzb @ Rot.T
-            Hm[ind,inds]   = dnorm_dzb           
-            Hm[ind+1,inds] = dangle_dzb
-            #Hm[inds,inds] = -Hx[inds,:2]          # Also working
+             
+            #Hm[ind,inds]   = dnorm_dzb            # Also working
+            #Hm[ind+1,inds] = dangle_dzb           # Also working
+            Hm[inds,inds] = -Hx[inds,:2]          
 
         # You can set some assertions here to make sure that some of the structure in H is correct
         
