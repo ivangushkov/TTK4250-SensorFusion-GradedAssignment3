@@ -97,25 +97,28 @@ def main():
     # K = 230
     M = len(landmarks)  # TODO What to use this for?
     
+    divergingRun = False
+    
     # Initial params
     # Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2 
     # R = np.diag([0.1, 1 * np.pi / 180]) ** 2 
     # JCBBalphas = np.array([0.001, 0.0001]) 
     
     # Bad map, good tracking
-    # Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2 
-    # R = np.diag([1, 5 * np.pi / 180]) ** 2 
-    # JCBBalphas = np.array([0.00001, 0.0000001])
+    Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2 
+    R = np.diag([1, 5 * np.pi / 180]) ** 2 
+    JCBBalphas = np.array([0.00001, 0.0000001])
 
     # Good params
-    Q = np.diag([0.09, 0.09, 0.6 * np.pi / 180]) ** 2 
-    R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2 
-    JCBBalphas = np.array([1e-4, 1e-5])     # to remove the 2 extra landmarks, use [1e-4, 2e-6]
+    # Q = np.diag([0.09, 0.09, 0.6 * np.pi / 180]) ** 2 
+    # R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2 
+    # JCBBalphas = np.array([1e-4, 1e-5])     # to remove the 2 extra landmarks, use [1e-4, 2e-6]
     
     # Diverging
     # Q = np.diag([0.1, 0.1, 0.1 * np.pi / 180]) ** 2 
     # R = np.diag([0.1, 1 * np.pi / 180]) ** 2 
     # JCBBalphas = np.array([0.001, 0.0001]) 
+    # divergingRun = True
 
     doAsso = True 
     calculate_map_NEES = True
@@ -268,17 +271,16 @@ def main():
 
     # NIS
     insideCI = (CInorm[:N, 0] <= NISnorm[:N]) * (NISnorm[:N] <= CInorm[:N, 1])
-    # TODO is this wrong?
     dof = num_assos.sum()
     ANIS = NIS.sum() / dof
-    ANIS_CI = np.array(chi2.interval(alpha, 2 * dof * N)) / (dof * N)
+    ANIS_CI = np.array(chi2.interval(alpha, 2 * dof)) / dof
 
     fig3, ax3 = plt.subplots(num=3, clear=True, figsize=(7, 5))
     ax3.plot(CInorm[:N, 0], '--')
     ax3.plot(CInorm[:N, 1], '--')
     ax3.plot(NISnorm[:N], lw=0.5)
 
-    ax3.set_title(f'NIS\n {round(insideCI.mean()*100,1)}% inside CI,    ANIS: {round(ANIS,4)}, CI: {ANIS_CI.round(4)}')
+    ax3.set_title(f'NIS\n {round(insideCI.mean()*100,1)}% inside CI,    ANIS: {round(ANIS,2)}, CI: {ANIS_CI.round(2)}')
     fig3.canvas.manager.set_window_title("NIS")
     fig3.savefig(plot_folder.joinpath("NIS.pdf"))
 
@@ -339,15 +341,16 @@ def main():
         # TODO is this wrong?
         dof = num_lmks.sum()
         ANEES_map = NEES_map.sum() / dof
-        ANEES_CI_map = np.array(chi2.interval(alpha, 2 * dof * N)) / (dof * N)
+        ANEES_CI_map = np.array(chi2.interval(alpha, 2 * dof)) / dof
 
         fig6, ax6 = plt.subplots(num=6, clear=True, figsize=(7, 5))
         ax6.plot(CInorm_NEES_map[:N, 0], '--')
         ax6.plot(CInorm_NEES_map[:N, 1], '--')
         ax6.plot(NEESnorm_map[:N], lw=0.5)
-        ax6.set_ylim((-0.1,5))
+        if not divergingRun:
+            ax6.set_ylim((-0.1,5))
 
-        ax6.set_title(f'Map NEES\n   {round(insideCI.mean()*100,1)}% inside CI,   ANEES: {round(ANEES_map,4)}, CI: {ANEES_CI_map.round(4)}')
+        ax6.set_title(f'Map NEES\n   {round(insideCI.mean()*100,1)}% inside CI,   ANEES: {round(ANEES_map,2)}, CI: {ANEES_CI_map.round(2)}')
         fig6.canvas.manager.set_window_title("Map NEES")
         fig6.savefig(plot_folder.joinpath("Map NEES.pdf"))
 
