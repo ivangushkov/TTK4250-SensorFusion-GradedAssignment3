@@ -110,15 +110,15 @@ def main():
     # JCBBalphas = np.array([0.00001, 0.0000001])
 
     # Good params
-    # Q = np.diag([0.09, 0.09, 0.6 * np.pi / 180]) ** 2 
-    # R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2 
-    # JCBBalphas = np.array([1e-4, 1e-5])     # to remove the 2 extra landmarks, use [1e-4, 2e-6]
+    Q = np.diag([0.09, 0.09, 0.6 * np.pi / 180]) ** 2 
+    R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2 
+    JCBBalphas = np.array([1e-4, 2e-6])     # to remove the 2 extra landmarks, use [1e-4, 2e-6]
     
     # Diverging
-    Q = np.diag([0.1, 0.1, 0.1 * np.pi / 180]) ** 2 
-    R = np.diag([0.1, 1 * np.pi / 180]) ** 2 
-    JCBBalphas = np.array([0.00001, 0.000001]) 
-    divergingRun = True
+    # Q = np.diag([0.1, 0.1, 0.1 * np.pi / 180]) ** 2 
+    # R = np.diag([0.1, 1 * np.pi / 180]) ** 2 
+    # JCBBalphas = np.array([0.00001, 0.000001]) 
+    # divergingRun = True
 
     doAsso = True 
     calculate_map_NEES = True
@@ -325,11 +325,16 @@ def main():
     errs = np.vstack((pos_err, heading_err))
 
     for ax, err, tag, ylabel, scaling in zip(ax5, errs, tags[1:], ylabels, scalings):
-        ax.plot(err*scaling)
+        ax.plot(err*scaling, label="error")
         ax.set_title(
             f"{tag}: RMSE {round(np.sqrt((err**2).mean())*scaling,3)} {ylabel}")
         ax.set_ylabel(f"[{ylabel}]")
         ax.grid()
+        if tag == "Pos":
+            ax_lmk = ax.twinx()
+            ax_lmk.set_ylabel("Number of landmarks")
+            ax_lmk.plot(num_lmks, c="indianred", label="num landmarks")
+            ax_lmk.legend()
 
     fig5.tight_layout()
     fig5.canvas.manager.set_window_title("RMSE")
