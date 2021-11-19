@@ -182,10 +182,10 @@ def main():
             # ? reset time to this laser time for next post predict
             t = timeLsr[mk]
             odo = odometry(speed[k + 1], steering[k + 1], dt, car)
-            eta, P =  # TODO predict
+            eta, P =  slam.predict(eta, P, odo)
 
             z = detectTrees(LASER[mk])
-            eta, P, NIS[mk], a[mk] =  # TODO update
+            eta, P, NIS[mk], a[mk] =  slam.update(eta, P, z)
 
             num_asso = np.count_nonzero(a[mk] > -1)
 
@@ -243,6 +243,26 @@ def main():
     ax3.plot(NISnorm[:mk], lw=0.5)
 
     ax3.set_title(f"NIS, {insideCI.mean()*100:.2f}% inside CI")
+
+    # ## GPS vs estimated track
+    # plot_folder = Path(__file__).parents[1].joinpath('plots')
+    # plot_folder.mkdir(exist_ok=True)
+    # 
+    # fig4, ax4 = plt.subplots(num=4, clear=True)
+    # ax4.scatter(
+    #     Lo_m[timeGps < timeOdo[N - 1]],
+    #     La_m[timeGps < timeOdo[N - 1]],
+    #     c="r",
+    #     marker=".",
+    #     label="GPS",
+    # )
+    # ax4.plot(*eta.T[:2], c="g", label="estimate")
+    # ax4.plot(*ellipse(eta[-1, :2], P[N - 1][:2, :2], 5, 200).T, c="g")
+    # ax4.grid()
+    # ax4.set_title("GPS vs estimated track")
+    # ax4.legend()
+    # fig4.canvas.manager.set_window_title("GPS vs estimate")
+    # fig4.savefig(plot_folder.joinpath("GPS vs estimate.pdf"))
 
     # %% slam
 
