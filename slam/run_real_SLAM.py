@@ -25,6 +25,8 @@ from utils import rotmat2d
 
 # %% plot config check and style setup
 
+plot_folder = Path(__file__).parents[1].joinpath('plots')
+plot_folder.mkdir(exist_ok=True)
 
 # to see your plot config
 print(f"matplotlib backend: {matplotlib.get_backend()}")
@@ -117,6 +119,8 @@ def main():
 
     # first is for joint compatibility, second is individual
     JCBBalphas = np.array([0.00001, 1e-6])  # TODO tune
+    
+    doPlot = False
 
     sensorOffset = np.array([car.a + car.L, car.b])
     doAsso = True
@@ -134,6 +138,8 @@ def main():
     NISnorm = np.zeros(mK)
     CI = np.zeros((mK, 2))
     CInorm = np.zeros((mK, 2))
+    num_assos = np.zeros((mK,1), dtype=int)
+
 
     # Initialize state
     # you might want to tweak these for a good reference
@@ -147,8 +153,6 @@ def main():
 
     # %%  run
     N = 1000  # K
-
-    doPlot = False
 
     lh_pose = None
 
@@ -189,12 +193,11 @@ def main():
             eta, P, NIS[mk], a[mk] =  slam.update(eta, P, z)
 
             num_asso = np.count_nonzero(a[mk] > -1)
+            num_assos[k] = num_asso
 
             if num_asso > 0:
-                NISnorm[mk] = NIS[mk] / (2 * num_asso)
-                CInorm[mk] = np.array(chi2.interval(confidence_prob, 2 * num_asso)) / (
-                    2 * num_asso
-                )
+                NISnorm[mk] = NIS[mk] / num_asso
+                CInorm[mk] = np.array(chi2.interval(confidence_prob, 2 * num_asso)) / num_asso
             else:
                 NISnorm[mk] = 1
                 CInorm[mk].fill(1)
@@ -237,18 +240,22 @@ def main():
     # NIS
     insideCI = (CInorm[:mk, 0] <= NISnorm[:mk]) * \
         (NISnorm[:mk] <= CInorm[:mk, 1])
+    dof = num_assos.sum()
+    ANIS = NIS.sum() / dof
+    ANIS_CI = np.array(chi2.interval(alpha, 2 * dof)) / dof
+
 
     fig3, ax3 = plt.subplots(num=3, clear=True)
     ax3.plot(CInorm[:mk, 0], "--")
     ax3.plot(CInorm[:mk, 1], "--")
     ax3.plot(NISnorm[:mk], lw=0.5)
 
-    ax3.set_title(f"NIS, {insideCI.mean()*100:.2f}% inside CI")
+    #ax3.set_title(f"NIS, {insideCI.mean()*100:.2f}% inside CI")
+    ax3.set_title(f'NIS\n {round(insideCI.mean()*100,1):.2f}% inside CI,    ANIS: {round(ANIS,3)}, CI: {ANIS_CI.round(3)}')
+    fig3.canvas.manager.set_window_title("NIS")
+    fig3.savefig(plot_folder.joinpath("NIS.pdf"))
 
-    # ## GPS vs estimated track
-    plot_folder = Path(__file__).parents[1].joinpath('plots')
-    plot_folder.mkdir(exist_ok=True)
-    
+    ## GPS vs estimated track
     fig4, ax4 = plt.subplots(num=4, clear=True)
     ax4.scatter(
         Lo_m[timeGps < timeOdo[N - 1]],
@@ -265,8 +272,7 @@ def main():
     fig4.canvas.manager.set_window_title("GPS vs estimate")
     fig4.savefig(plot_folder.joinpath("GPS vs estimate.pdf"))
 
-    # %% slam
-
+    ## GPS vs odometry
     if do_raw_prediction:
         fig5, ax5 = plt.subplots(num=5, clear=True)
         ax5.scatter(
@@ -280,14 +286,18 @@ def main():
         ax5.grid()
         ax5.set_title("GPS vs odometry integration")
         ax5.legend()
+        fig5.canvas.manager.set_window_title("GPS vs odometry")
+        fig5.savefig(plot_folder.joinpath("GPS vs odometry.pdf"))
 
-    # %%
+    # Estimated track and landmarks
     fig6, ax6 = plt.subplots(num=6, clear=True)
     ax6.scatter(*eta[3:].reshape(-1, 2).T, color="r", marker="x")
     ax6.plot(*xupd[mk_first:mk, :2].T)
     ax6.set(
         title=f"Steps {k}, laser scans {mk-1}, landmarks {len(eta[3:])//2},\nmeasurements {z.shape[0]}, num new = {np.sum(a[mk] == -1)}"
     )
+    fig6.canvas.manager.set_window_title("Tracking results")
+    fig6.savefig(plot_folder.joinpath("Tracking results.pdf"))
     plt.show()
 
 
