@@ -139,6 +139,7 @@ def main():
     # you might want to tweak these for a good reference
     eta = np.array([Lo_m[0], La_m[1], 36 * np.pi / 180])
     P = np.zeros((3, 3))
+    xupd[0] = eta
 
     mk_first = 1  # first seems to be a bit off in timing
     mk = mk_first
@@ -245,24 +246,24 @@ def main():
     ax3.set_title(f"NIS, {insideCI.mean()*100:.2f}% inside CI")
 
     # ## GPS vs estimated track
-    # plot_folder = Path(__file__).parents[1].joinpath('plots')
-    # plot_folder.mkdir(exist_ok=True)
-    # 
-    # fig4, ax4 = plt.subplots(num=4, clear=True)
-    # ax4.scatter(
-    #     Lo_m[timeGps < timeOdo[N - 1]],
-    #     La_m[timeGps < timeOdo[N - 1]],
-    #     c="r",
-    #     marker=".",
-    #     label="GPS",
-    # )
-    # ax4.plot(*eta.T[:2], c="g", label="estimate")
-    # ax4.plot(*ellipse(eta[-1, :2], P[N - 1][:2, :2], 5, 200).T, c="g")
-    # ax4.grid()
-    # ax4.set_title("GPS vs estimated track")
-    # ax4.legend()
-    # fig4.canvas.manager.set_window_title("GPS vs estimate")
-    # fig4.savefig(plot_folder.joinpath("GPS vs estimate.pdf"))
+    plot_folder = Path(__file__).parents[1].joinpath('plots')
+    plot_folder.mkdir(exist_ok=True)
+    
+    fig4, ax4 = plt.subplots(num=4, clear=True)
+    ax4.scatter(
+        Lo_m[timeGps < timeOdo[N - 1]],
+        La_m[timeGps < timeOdo[N - 1]],
+        c="r",
+        marker=".",
+        label="GPS",
+    )
+    ax4.plot(*xupd[:mk,:2].T, c="g", label="estimate")
+    ax4.plot(*ellipse(xupd[mk-1, :2], P[:2, :2], 5, 200).T, c="g")
+    ax4.grid()
+    ax4.set_title("GPS vs estimated track")
+    ax4.legend()
+    fig4.canvas.manager.set_window_title("GPS vs estimate")
+    fig4.savefig(plot_folder.joinpath("GPS vs estimate.pdf"))
 
     # %% slam
 
