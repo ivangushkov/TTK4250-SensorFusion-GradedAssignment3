@@ -10,6 +10,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from scipy.stats import chi2
+from scipy.spatial import distance
 import utils
 from pathlib import Path
 
@@ -94,11 +95,9 @@ def main():
     poseGT = simSLAM_ws["poseGT"].T
 
     K = len(z)
-    # K = 230
-    M = len(landmarks)  # TODO What to use this for?
-    
-    divergingRun = False
-    
+    #K = 40
+    M = len(landmarks) 
+        
     # Initial params
     # Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2 
     # R = np.diag([0.1, 1 * np.pi / 180]) ** 2 
@@ -117,8 +116,7 @@ def main():
     # Diverging
     # Q = np.diag([0.1, 0.1, 0.1 * np.pi / 180]) ** 2 
     # R = np.diag([0.1, 1 * np.pi / 180]) ** 2 
-    # JCBBalphas = np.array([0.00001, 0.000001]) 
-    # divergingRun = True
+    # JCBBalphas = np.array([0.001, 0.0001]) 
 
     doAsso = True 
     calculate_map_NEES = True
@@ -343,7 +341,6 @@ def main():
     # Landmark NEES
     if calculate_map_NEES:
         insideCI = (CInorm_NEES_map[:N, 0] <= NEESnorm_map[:N]) * (NEESnorm_map[:N] <= CInorm_NEES_map[:N, 1])
-        # TODO is this wrong?
         dof = num_lmks.sum()
         ANEES_map = NEES_map.sum() / dof
         ANEES_CI_map = np.array(chi2.interval(alpha, 2 * dof)) / dof
@@ -352,8 +349,6 @@ def main():
         ax6.plot(CInorm_NEES_map[:N, 0], '--')
         ax6.plot(CInorm_NEES_map[:N, 1], '--')
         ax6.plot(NEESnorm_map[:N], lw=0.5)
-        if not divergingRun:
-            ax6.set_ylim((-0.1,5))
 
         ax6.set_title(f'Map NEES\n   {round(insideCI.mean()*100,1)}% inside CI,   ANEES: {round(ANEES_map,2)}, CI: {ANEES_CI_map.round(2)}')
         fig6.canvas.manager.set_window_title("Map NEES")
@@ -368,7 +363,7 @@ def main():
             from celluloid import Camera
 
             pauseTime = 0.05
-            fig_movie, ax_movie = plt.subplots(num=6, clear=True)
+            fig_movie, ax_movie = plt.subplots(num=7, clear=True, figsize=(7, 5))
 
             camera = Camera(fig_movie)
 
@@ -422,15 +417,22 @@ def lmk_NEES(
     num_lmk_gt = lmk_gt.shape[0]
     num_lmk_hat = lmk_hat.size // 2
     lmk_hat = lmk_hat.reshape(num_lmk_hat,2)
+    dists = np.zeros((num_lmk_gt,1))
     error = np.zeros_like(lmk_hat)
+
     
     # Find the closest true landmark to each estimate and assume they are associated
-    # TODO consider if this is wierd to do, especially when multiple estimates are assigned to same true lmk
     for i in range (num_lmk_hat):
-        diff = lmk_gt - np.tile(lmk_hat[i], (num_lmk_gt,1))
-        norms = np.linalg.norm(diff, 2, 1)
-        error[i] = lmk_hat[i] - lmk_gt[norms.argmin()]
+        inds = slice(2*i, 2*i + 2)
+        Pi_inv = np.linalg.inv(P_hat_lmk[inds,inds])
+        
+        for k in range (num_lmk_gt):
+            dists[k] = distance.mahalanobis(lmk_hat[i], lmk_gt[k], Pi_inv)
+        
+        idx_closest = (np.abs(dists - 2)).argmin()
+        error[i] = lmk_hat[i] - lmk_gt[idx_closest]
     
+   
     error = error.ravel()
     NEES = error @ (np.linalg.solve(P_hat_lmk, error))
     
