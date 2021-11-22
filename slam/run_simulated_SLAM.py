@@ -111,7 +111,8 @@ def main():
     # Good params
     Q = np.diag([0.09, 0.09, 0.6 * np.pi / 180]) ** 2 
     R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2 
-    JCBBalphas = np.array([1e-4, 2e-6])     # to remove the 2 extra landmarks, use [1e-4, 2e-6]
+    JCBBalphas = np.array([1e-4, 1e-5])     
+    # to remove the 2 extra landmarks, use alpha_2 = 2e-6, other tuning uses 1e-5
     
     # Diverging
     # Q = np.diag([0.1, 0.1, 0.1 * np.pi / 180]) ** 2 
@@ -404,8 +405,8 @@ def lmk_NEES(
     lmk_hat: np.ndarray, P_hat_lmk: np.ndarray, lmk_gt: np.ndarray
 ) -> float:
     '''
-    Calculates NEES of landmarks. Estimated lmks are assigned to nearest true lmk.
-    So multiple estimates may be assigned to the same true one.
+    Calculates NEES of landmarks. Estimated lmks are assigned to nearest true lmk, using 
+    Mahalanobis distance. So multiple estimates may be assigned to the same true one.
     Reassociates estimates and true lmks each time as estimates may move over time.
     Is perhaps not needed, if so one only needs to perform association on new landmarks.
     '''
