@@ -98,6 +98,7 @@ def main():
     )  # Divide by 100 to be compatible with Python implementation of detectTrees
     La_m = realSLAM_ws["La_m"].ravel()
     Lo_m = realSLAM_ws["Lo_m"].ravel()
+    gps = np.vstack((Lo_m, La_m)).T
 
     K = timeOdo.size
     mK = timeLsr.size
@@ -120,7 +121,10 @@ def main():
     # first is for joint compatibility, second is individual
     JCBBalphas = np.array([0.00001, 1e-6])  # TODO tune
     
+    R_gps = np.diag([2, 2]) ** 2
+    
     doPlot = False
+    do_raw_prediction = False
 
     sensorOffset = np.array([car.a + car.L, car.b])
     doAsso = True
@@ -139,6 +143,8 @@ def main():
     CI = np.zeros((mK, 2))
     CInorm = np.zeros((mK, 2))
     num_assos = np.zeros((mK,1), dtype=int)
+    gps_nis = np.zeros((Kgps,1))
+    gps_ind = 0
 
 
     # Initialize state
@@ -152,7 +158,7 @@ def main():
     t = timeOdo[0]
 
     # %%  run
-    N = 1000  # K
+    N = K//3
 
     lh_pose = None
 
@@ -163,7 +169,6 @@ def main():
         sh_lmk = ax.scatter(np.nan, np.nan, c="r", marker="x")
         sh_Z = ax.scatter(np.nan, np.nan, c="b", marker=".")
 
-    do_raw_prediction = True
     if do_raw_prediction:
         odos = np.zeros((K, 3))
         odox = np.zeros((K, 3))
@@ -193,7 +198,7 @@ def main():
             eta, P, NIS[mk], a[mk] =  slam.update(eta, P, z)
 
             num_asso = np.count_nonzero(a[mk] > -1)
-            num_assos[k] = num_asso
+            num_assos[mk] = num_asso
 
             if num_asso > 0:
                 NISnorm[mk] = NIS[mk] / num_asso
@@ -234,9 +239,32 @@ def main():
             t = timeOdo[k + 1]
             odo = odometry(speed[k + 1], steering[k + 1], dt, car)
             eta, P = slam.predict(eta, P, odo)
+            
+        # What if the previous state is closer in time to the next gps measurement?
+        if t >= timeGps[gps_ind]:
+            gps_nis[gps_ind] = get_gps_nis_3d(eta[:3], P[:3,:3], gps[gps_ind], R_gps, sensorOffset)
+            #gps_nis[gps_ind] = get_gps_nis(eta[:2], P[:2,:2], gps[gps_ind], R_gps)
+            gps_ind += 1
 
     # %% Consistency
+    
+    # GPS NIS
+    gps_CI = np.tile(chi2.interval(confidence_prob, 2), (gps_ind,1))
+    gps_insideCI = (gps_CI[:,0] <= gps_nis[:gps_ind]) * \
+        (gps_nis[:gps_ind] <= gps_CI[:,1])
+    gps_ANIS = gps_nis[:gps_ind].mean()
+    gps_ANIS_CI = np.array(chi2.interval(confidence_prob, 2 * gps_ind)) / gps_ind
+    
+    
+    fig2, ax2 = plt.subplots(num=2, clear=True, figsize=(7, 5))
+    ax2.plot(gps_CI[:,0], "--")
+    ax2.plot(gps_CI[:,1], "--")
+    ax2.plot(gps_nis[:gps_ind], lw=0.5)
 
+    ax2.set_title(f'GPS NIS\n {round(gps_insideCI.mean()*100,1):.2f}% inside CI,    ANIS: {round(gps_ANIS,3)}, CI: {gps_ANIS_CI.round(3)}')
+    fig2.canvas.manager.set_window_title("GPS NIS")
+    fig2.savefig(plot_folder.joinpath("GPS NIS.pdf"))
+    
     # NIS
     insideCI = (CInorm[:mk, 0] <= NISnorm[:mk]) * \
         (NISnorm[:mk] <= CInorm[:mk, 1])
@@ -245,18 +273,17 @@ def main():
     ANIS_CI = np.array(chi2.interval(alpha, 2 * dof)) / dof
 
 
-    fig3, ax3 = plt.subplots(num=3, clear=True)
+    fig3, ax3 = plt.subplots(num=3, clear=True, figsize=(7, 5))
     ax3.plot(CInorm[:mk, 0], "--")
     ax3.plot(CInorm[:mk, 1], "--")
     ax3.plot(NISnorm[:mk], lw=0.5)
 
-    #ax3.set_title(f"NIS, {insideCI.mean()*100:.2f}% inside CI")
     ax3.set_title(f'NIS\n {round(insideCI.mean()*100,1):.2f}% inside CI,    ANIS: {round(ANIS,3)}, CI: {ANIS_CI.round(3)}')
     fig3.canvas.manager.set_window_title("NIS")
     fig3.savefig(plot_folder.joinpath("NIS.pdf"))
 
     ## GPS vs estimated track
-    fig4, ax4 = plt.subplots(num=4, clear=True)
+    fig4, ax4 = plt.subplots(num=4, clear=True, figsize=(7, 5))
     ax4.scatter(
         Lo_m[timeGps < timeOdo[N - 1]],
         La_m[timeGps < timeOdo[N - 1]],
@@ -274,7 +301,7 @@ def main():
 
     ## GPS vs odometry
     if do_raw_prediction:
-        fig5, ax5 = plt.subplots(num=5, clear=True)
+        fig5, ax5 = plt.subplots(num=5, clear=True, figsize=(7, 5))
         ax5.scatter(
             Lo_m[timeGps < timeOdo[N - 1]],
             La_m[timeGps < timeOdo[N - 1]],
@@ -290,7 +317,7 @@ def main():
         fig5.savefig(plot_folder.joinpath("GPS vs odometry.pdf"))
 
     # Estimated track and landmarks
-    fig6, ax6 = plt.subplots(num=6, clear=True)
+    fig6, ax6 = plt.subplots(num=6, clear=True, figsize=(7, 5))
     ax6.scatter(*eta[3:].reshape(-1, 2).T, color="r", marker="x")
     ax6.plot(*xupd[mk_first:mk, :2].T)
     ax6.set(
@@ -300,6 +327,43 @@ def main():
     fig6.savefig(plot_folder.joinpath("Tracking results.pdf"))
     plt.show()
 
+
+def get_gps_nis(
+    pos_hat: np.ndarray, P_hat: np.ndarray, pos_gps: np.ndarray, R_gps: np.ndarray
+) -> float:
+    
+    assert pos_hat.size == 2
+    assert pos_hat.shape * 2 == P_hat.shape
+    assert pos_gps.size == 2
+    assert pos_gps.shape * 2 == R_gps.shape  
+    
+    innovation = pos_hat - pos_gps
+    S = P_hat + R_gps
+    
+    NIS = innovation @ (np.linalg.solve(S, innovation))
+    return NIS
+
+def get_gps_nis_3d(
+    pos_hat: np.ndarray, P_hat: np.ndarray, 
+    pos_gps: np.ndarray, R_gps: np.ndarray, 
+    sensorOffset: np.ndarray
+) -> float:
+    
+    assert pos_hat.size == 3
+    assert pos_hat.shape * 2 == P_hat.shape
+    assert pos_gps.size == 2
+    assert pos_gps.shape * 2 == R_gps.shape  
+    
+    innovation = pos_hat[:2] - pos_gps
+    a = pos_hat[2]
+    drotmat_dangle = - np.array([[ np.sin(a), np.cos(a)],
+                                 [-np.cos(a), np.sin(a)]])
+    H = np.eye(2,3)
+    H[:,2] = drotmat_dangle @ sensorOffset
+    S = H @ P_hat @ H.T + R_gps
+    
+    NIS = innovation @ (np.linalg.solve(S, innovation))
+    return NIS
 
 if __name__ == "__main__":
     main()
