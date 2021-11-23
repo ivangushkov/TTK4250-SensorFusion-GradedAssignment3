@@ -121,7 +121,7 @@ def main():
     # first is for joint compatibility, second is individual
     JCBBalphas = np.array([0.00001, 1e-6])  # TODO tune
     
-    R_gps = np.diag([2, 2]) ** 2
+    R_gps = np.diag([3, 3]) ** 2
     
     doPlot = False
     do_raw_prediction = False
