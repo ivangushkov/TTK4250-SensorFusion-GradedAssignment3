@@ -112,19 +112,30 @@ def main():
     b = 0.5  # laser distance to the left of center
 
     car = Car(L, H, a, b)
+    
+    # Initial
+    # sigmas = 0.025 * np.array([1e-4, 5e-5, 6 * np.pi / 180])
+    # R = np.diag([0.1, 1 * np.pi / 180]) ** 2  
+    # JCBBalphas = np.array([1e-5, 1e-6])
 
-    sigmas = 0.025 * np.array([0.0001, 0.00005, 6 * np.pi / 180])  # TODO tune
-    CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
-    Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
-    R = np.diag([0.1, 1 * np.pi / 180]) ** 2  # TODO tune
-
-    # first is for joint compatibility, second is individual
-    JCBBalphas = np.array([0.00001, 1e-6])  # TODO tune
+    # Good track, consider using 4 in R_gps 
+    sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
+    R = np.diag([1, 2 * np.pi / 180]) ** 2  
+    JCBBalphas = np.array([1e-5, 1e-6])
+    
+    # Diverging with low NIS and many landmarks, run N = K//4 feks
+    # sigmas = 0.025 * np.array([1e-3, 1e-4, 1 * np.pi / 180])
+    # R = np.diag([1, 2 * np.pi / 180]) ** 2  
+    # JCBBalphas = np.array([5e-4, 5e-5])
     
     R_gps = np.diag([3, 3]) ** 2
     
+    CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
+    Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
+    
     doPlot = False
     do_raw_prediction = False
+    showPlots = False
 
     sensorOffset = np.array([car.a + car.L, car.b])
     doAsso = True
@@ -158,7 +169,7 @@ def main():
     t = timeOdo[0]
 
     # %%  run
-    N = K//3
+    N = K // 4
 
     lh_pose = None
 
@@ -282,22 +293,22 @@ def main():
     fig3.canvas.manager.set_window_title("NIS")
     fig3.savefig(plot_folder.joinpath("NIS.pdf"))
 
-    ## GPS vs estimated track
-    fig4, ax4 = plt.subplots(num=4, clear=True, figsize=(7, 5))
-    ax4.scatter(
-        Lo_m[timeGps < timeOdo[N - 1]],
-        La_m[timeGps < timeOdo[N - 1]],
-        c="r",
-        marker=".",
-        label="GPS",
-    )
-    ax4.plot(*xupd[:mk,:2].T, c="g", label="estimate")
-    ax4.plot(*ellipse(xupd[mk-1, :2], P[:2, :2], 5, 200).T, c="g")
-    ax4.grid()
-    ax4.set_title("GPS vs estimated track")
-    ax4.legend()
-    fig4.canvas.manager.set_window_title("GPS vs estimate")
-    fig4.savefig(plot_folder.joinpath("GPS vs estimate.pdf"))
+    # ## GPS vs estimated track
+    # fig4, ax4 = plt.subplots(num=4, clear=True, figsize=(7, 5))
+    # ax4.scatter(
+    #     Lo_m[timeGps < timeOdo[N - 1]],
+    #     La_m[timeGps < timeOdo[N - 1]],
+    #     c="r",
+    #     marker=".",
+    #     label="GPS",
+    # )
+    # ax4.plot(*xupd[:mk,:2].T, c="g", label="estimate")
+    # ax4.plot(*ellipse(xupd[mk-1, :2], P[:2, :2], 5, 200).T, c="g")
+    # ax4.grid()
+    # ax4.set_title("GPS vs estimated track")
+    # ax4.legend()
+    # fig4.canvas.manager.set_window_title("GPS vs estimate")
+    # fig4.savefig(plot_folder.joinpath("GPS vs estimate.pdf"))
 
     ## GPS vs odometry
     if do_raw_prediction:
@@ -318,30 +329,26 @@ def main():
 
     # Estimated track and landmarks
     fig6, ax6 = plt.subplots(num=6, clear=True, figsize=(7, 5))
-    ax6.scatter(*eta[3:].reshape(-1, 2).T, color="r", marker="x")
-    ax6.plot(*xupd[mk_first:mk, :2].T)
+    ax6.scatter(*eta[3:].reshape(-1, 2).T, color="r", marker="x", label="landmarks")
+    ax6.scatter(
+        Lo_m[timeGps < timeOdo[N - 1]],
+        La_m[timeGps < timeOdo[N - 1]],
+        c="g",
+        marker=".",
+        label="GPS",
+    )
+    ax6.plot(*xupd[mk_first:mk, :2].T, c="b", label="estimate")
+    ax6.plot(*ellipse(xupd[mk-1, :2], P[:2, :2], 5, 200).T, c="b")
+    ax6.legend()
     ax6.set(
         title=f"Steps {k}, laser scans {mk-1}, landmarks {len(eta[3:])//2},\nmeasurements {z.shape[0]}, num new = {np.sum(a[mk] == -1)}"
     )
     fig6.canvas.manager.set_window_title("Tracking results")
     fig6.savefig(plot_folder.joinpath("Tracking results.pdf"))
-    plt.show()
-
-
-def get_gps_nis(
-    pos_hat: np.ndarray, P_hat: np.ndarray, pos_gps: np.ndarray, R_gps: np.ndarray
-) -> float:
     
-    assert pos_hat.size == 2
-    assert pos_hat.shape * 2 == P_hat.shape
-    assert pos_gps.size == 2
-    assert pos_gps.shape * 2 == R_gps.shape  
-    
-    innovation = pos_hat - pos_gps
-    S = P_hat + R_gps
-    
-    NIS = innovation @ (np.linalg.solve(S, innovation))
-    return NIS
+    if showPlots:
+        plt.show()
+        
 
 def get_gps_nis_3d(
     pos_hat: np.ndarray, P_hat: np.ndarray, 
