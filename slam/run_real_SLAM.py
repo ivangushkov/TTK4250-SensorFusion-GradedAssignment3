@@ -120,9 +120,9 @@ def main():
     # XJCBBalphas = np.array([1e-5, 1e-6])
 
     # Good track
-    # sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
-    # R = np.diag([1, 2 * np.pi / 180]) ** 2  
-    # JCBBalphas = np.array([1e-5, 1e-6])
+    sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
+    R = np.diag([1, 2 * np.pi / 180]) ** 2  
+    JCBBalphas = np.array([1e-5, 1e-6])
     
     # sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
     # R = np.diag([0.1, 1 * np.pi / 180]) ** 2  
@@ -131,16 +131,16 @@ def main():
     # Test Rgps og P0 2, P0 heading også 2
     
     # Diverging with low NIS and many landmarks, run N = K//4 feks
-    sigmas = 0.025 * np.array([1e-3, 1e-4, 1 * np.pi / 180])
-    R = np.diag([1, 2 * np.pi / 180]) ** 2  
-    JCBBalphas = np.array([5e-4, 5e-5])
+    # sigmas = 0.025 * np.array([1e-3, 1e-4, 1 * np.pi / 180])
+    # R = np.diag([1, 2 * np.pi / 180]) ** 2  
+    # JCBBalphas = np.array([5e-4, 5e-5])
     
     R_gps = np.diag([3, 3]) ** 2
     # P = np.zeros((3, 3))
     stds = np.diag([3, 3, 1 * np.pi / 180])
     P = stds @ CorrCoeff @ stds
     
-    
+    N = K
     
     Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
     # Initialize state
@@ -149,7 +149,7 @@ def main():
     
     doPlot = False
     do_raw_prediction = False
-    showPlots = False
+    showPlots = True
 
     sensorOffset = np.array([car.a + car.L, car.b])
     doAsso = True
@@ -177,9 +177,6 @@ def main():
     mk_first = 1  # first seems to be a bit off in timing
     mk = mk_first
     t = timeOdo[0]
-
-    # %%  run
-    N = K // 4
 
     lh_pose = None
 
@@ -283,12 +280,14 @@ def main():
     ax2[0].plot(gps_CI[:,0], "--")
     ax2[0].plot(gps_CI[:,1], "--")
     ax2[0].plot(gps_nis[:gps_ind], lw=0.5)
+    ax2[0].set_ylim((-2, 18))
     ax2[0].set_title(f'GPS NIS\n {round(gps_insideCI.mean()*100,1):.2f}% inside CI,    ANIS: {round(gps_ANIS,3)}, CI: {gps_ANIS_CI.round(3)}')
     
     pos_err = pos_err[:gps_ind]
     ax2[1].plot(pos_err, label="error")
     ax2[1].set_title(f"Position error,   RMSE: {round(np.sqrt((pos_err**2).mean()),3)} m")
     ax2[1].set_ylabel(f"[m]")
+    ax2[1].set_ylim((-2, 18))
     ax2[1].set_xlabel("GPS measurements")
     
     fig2.canvas.manager.set_window_title("GPS Comparison")
