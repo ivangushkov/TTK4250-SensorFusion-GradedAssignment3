@@ -257,7 +257,7 @@ def main():
 
         # What if the previous state is closer in time to the next gps measurement?
         # The odometry is so fast updated that this is porbably not an issue 
-        if t >= timeGps[gps_ind]:
+        if gps_ind < timeGps.size and t >= timeGps[gps_ind]:
             pos_err[gps_ind] = np.linalg.norm(eta[:2] - gps[gps_ind])
             gps_nis[gps_ind] = get_gps_nis(eta[:3], P[:3,:3], gps[gps_ind], R_gps, sensorOffset)
             gps_ind += 1
