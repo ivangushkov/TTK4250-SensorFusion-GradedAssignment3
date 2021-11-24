@@ -115,20 +115,18 @@ def main():
     CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
     
     # Initial
-    # sigmas = 0.025 * np.array([1e-4, 5e-5, 6 * np.pi / 180])
-    # XR = np.diag([0.1, 1 * np.pi / 180]) ** 2  
-    # XJCBBalphas = np.array([1e-5, 1e-6])
+    sigmas = 0.025 * np.array([1e-4, 5e-5, 6 * np.pi / 180])
+    R = np.diag([0.1, 1 * np.pi / 180]) ** 2  
+    JCBBalphas = np.array([1e-5, 1e-6])
 
     # Good track
-    sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
-    R = np.diag([1, 2 * np.pi / 180]) ** 2  
-    JCBBalphas = np.array([1e-5, 1e-6])
+    # sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
+    # R = np.diag([1, 2 * np.pi / 180]) ** 2  
+    # JCBBalphas = np.array([1e-5, 1e-6])
     
     # sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
     # R = np.diag([0.1, 1 * np.pi / 180]) ** 2  
     # JCBBalphas = np.array([1e-5, 1e-6])
-    
-    # Test Rgps og P0 2, P0 heading også 2
     
     # Diverging with low NIS and many landmarks, run N = K//4 feks
     # sigmas = 0.025 * np.array([1e-3, 1e-4, 1 * np.pi / 180])
@@ -136,9 +134,9 @@ def main():
     # JCBBalphas = np.array([5e-4, 5e-5])
     
     R_gps = np.diag([3, 3]) ** 2
-    # P = np.zeros((3, 3))
-    stds = np.diag([3, 3, 1 * np.pi / 180])
-    P = stds @ CorrCoeff @ stds
+    P = np.zeros((3, 3))
+    # stds = np.diag([3, 3, 1 * np.pi / 180])
+    # P = stds @ CorrCoeff @ stds
     
     N = K
     
@@ -280,15 +278,17 @@ def main():
     ax2[0].plot(gps_CI[:,0], "--")
     ax2[0].plot(gps_CI[:,1], "--")
     ax2[0].plot(gps_nis[:gps_ind], lw=0.5)
-    ax2[0].set_ylim((-2, 18))
     ax2[0].set_title(f'GPS NIS\n {round(gps_insideCI.mean()*100,1):.2f}% inside CI,    ANIS: {round(gps_ANIS,3)}, CI: {gps_ANIS_CI.round(3)}')
     
     pos_err = pos_err[:gps_ind]
     ax2[1].plot(pos_err, label="error")
     ax2[1].set_title(f"Position error,   RMSE: {round(np.sqrt((pos_err**2).mean()),3)} m")
     ax2[1].set_ylabel(f"[m]")
-    ax2[1].set_ylim((-2, 18))
     ax2[1].set_xlabel("GPS measurements")
+    
+    if gps_ind > 3400:              # Due to one wierd measurement
+        ax2[1].set_ylim((-2, 18))
+        ax2[0].set_ylim((-2, 18))
     
     fig2.canvas.manager.set_window_title("GPS Comparison")
     fig2.savefig(plot_folder.joinpath("GPS Comparison.pdf"))
