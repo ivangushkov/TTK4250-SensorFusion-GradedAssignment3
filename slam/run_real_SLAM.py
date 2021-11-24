@@ -112,32 +112,40 @@ def main():
     b = 0.5  # laser distance to the left of center
 
     car = Car(L, H, a, b)
+    CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
     
     # Initial
     # sigmas = 0.025 * np.array([1e-4, 5e-5, 6 * np.pi / 180])
-    # R = np.diag([0.1, 1 * np.pi / 180]) ** 2  
-    # JCBBalphas = np.array([1e-5, 1e-6])
+    # XR = np.diag([0.1, 1 * np.pi / 180]) ** 2  
+    # XJCBBalphas = np.array([1e-5, 1e-6])
 
     # Good track
     # sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
     # R = np.diag([1, 2 * np.pi / 180]) ** 2  
     # JCBBalphas = np.array([1e-5, 1e-6])
     
-    sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
-    R = np.diag([1, 2 * np.pi / 180]) ** 2  
-    JCBBalphas = np.array([1e-5, 1e-6])
+    # sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
+    # R = np.diag([0.1, 1 * np.pi / 180]) ** 2  
+    # JCBBalphas = np.array([1e-5, 1e-6])
     
     # Test Rgps og P0 2, P0 heading også 2
     
     # Diverging with low NIS and many landmarks, run N = K//4 feks
-    # sigmas = 0.025 * np.array([1e-3, 1e-4, 1 * np.pi / 180])
-    # R = np.diag([1, 2 * np.pi / 180]) ** 2  
-    # JCBBalphas = np.array([5e-4, 5e-5])
+    sigmas = 0.025 * np.array([1e-3, 1e-4, 1 * np.pi / 180])
+    R = np.diag([1, 2 * np.pi / 180]) ** 2  
+    JCBBalphas = np.array([5e-4, 5e-5])
     
     R_gps = np.diag([3, 3]) ** 2
+    # P = np.zeros((3, 3))
+    stds = np.diag([3, 3, 1 * np.pi / 180])
+    P = stds @ CorrCoeff @ stds
     
-    CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
+    
+    
     Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
+    # Initialize state
+    # you might want to tweak these for a good reference
+    eta = np.array([Lo_m[0], La_m[1], 36 * np.pi / 180])
     
     doPlot = False
     do_raw_prediction = False
@@ -164,13 +172,6 @@ def main():
     pos_err = np.zeros((Kgps,1))
     gps_ind = 0
 
-
-    # Initialize state
-    # you might want to tweak these for a good reference
-    eta = np.array([Lo_m[0], La_m[1], 36 * np.pi / 180])
-    # P = np.zeros((3, 3))
-    stds = np.diag([3, 3, 1 * np.pi / 180])
-    P = stds @ CorrCoeff @ stds
     xupd[0] = eta
 
     mk_first = 1  # first seems to be a bit off in timing
