@@ -118,10 +118,16 @@ def main():
     # R = np.diag([0.1, 1 * np.pi / 180]) ** 2  
     # JCBBalphas = np.array([1e-5, 1e-6])
 
-    # Good track, consider using 4 in R_gps 
+    # Good track
+    # sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
+    # R = np.diag([1, 2 * np.pi / 180]) ** 2  
+    # JCBBalphas = np.array([1e-5, 1e-6])
+    
     sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
     R = np.diag([1, 2 * np.pi / 180]) ** 2  
     JCBBalphas = np.array([1e-5, 1e-6])
+    
+    # Test Rgps og P0 2, P0 heading også 2
     
     # Diverging with low NIS and many landmarks, run N = K//4 feks
     # sigmas = 0.025 * np.array([1e-3, 1e-4, 1 * np.pi / 180])
@@ -155,13 +161,16 @@ def main():
     CInorm = np.zeros((mK, 2))
     num_assos = np.zeros((mK,1), dtype=int)
     gps_nis = np.zeros((Kgps,1))
+    pos_err = np.zeros((Kgps,1))
     gps_ind = 0
 
 
     # Initialize state
     # you might want to tweak these for a good reference
     eta = np.array([Lo_m[0], La_m[1], 36 * np.pi / 180])
-    P = np.zeros((3, 3))
+    # P = np.zeros((3, 3))
+    stds = np.diag([3, 3, 1 * np.pi / 180])
+    P = stds @ CorrCoeff @ stds
     xupd[0] = eta
 
     mk_first = 1  # first seems to be a bit off in timing
@@ -245,17 +254,19 @@ def main():
 
             mk += 1
 
+        # What if the previous state is closer in time to the next gps measurement?
+        # The odometry is so fast updated that this is porbably not an issue 
+        if t >= timeGps[gps_ind]:
+            pos_err[gps_ind] = np.linalg.norm(eta[:2] - gps[gps_ind])
+            gps_nis[gps_ind] = get_gps_nis(eta[:3], P[:3,:3], gps[gps_ind], R_gps, sensorOffset)
+            gps_ind += 1
+
         if k < K - 1:
             dt = timeOdo[k + 1] - t
             t = timeOdo[k + 1]
             odo = odometry(speed[k + 1], steering[k + 1], dt, car)
             eta, P = slam.predict(eta, P, odo)
             
-        # What if the previous state is closer in time to the next gps measurement?
-        if t >= timeGps[gps_ind]:
-            gps_nis[gps_ind] = get_gps_nis_3d(eta[:3], P[:3,:3], gps[gps_ind], R_gps, sensorOffset)
-            #gps_nis[gps_ind] = get_gps_nis(eta[:2], P[:2,:2], gps[gps_ind], R_gps)
-            gps_ind += 1
 
     # %% Consistency
     
@@ -267,14 +278,20 @@ def main():
     gps_ANIS_CI = np.array(chi2.interval(confidence_prob, 2 * gps_ind)) / gps_ind
     
     
-    fig2, ax2 = plt.subplots(num=2, clear=True, figsize=(7, 5))
-    ax2.plot(gps_CI[:,0], "--")
-    ax2.plot(gps_CI[:,1], "--")
-    ax2.plot(gps_nis[:gps_ind], lw=0.5)
-
-    ax2.set_title(f'GPS NIS\n {round(gps_insideCI.mean()*100,1):.2f}% inside CI,    ANIS: {round(gps_ANIS,3)}, CI: {gps_ANIS_CI.round(3)}')
-    fig2.canvas.manager.set_window_title("GPS NIS")
-    fig2.savefig(plot_folder.joinpath("GPS NIS.pdf"))
+    fig2, ax2 = plt.subplots(nrows=2, ncols=1, num=2, clear=True, figsize=(7, 7))
+    ax2[0].plot(gps_CI[:,0], "--")
+    ax2[0].plot(gps_CI[:,1], "--")
+    ax2[0].plot(gps_nis[:gps_ind], lw=0.5)
+    ax2[0].set_title(f'GPS NIS\n {round(gps_insideCI.mean()*100,1):.2f}% inside CI,    ANIS: {round(gps_ANIS,3)}, CI: {gps_ANIS_CI.round(3)}')
+    
+    pos_err = pos_err[:gps_ind]
+    ax2[1].plot(pos_err, label="error")
+    ax2[1].set_title(f"Position error,   RMSE: {round(np.sqrt((pos_err**2).mean()),3)} m")
+    ax2[1].set_ylabel(f"[m]")
+    ax2[1].set_xlabel("GPS measurements")
+    
+    fig2.canvas.manager.set_window_title("GPS Comparison")
+    fig2.savefig(plot_folder.joinpath("GPS Comparison.pdf"))
     
     # NIS
     insideCI = (CInorm[:mk, 0] <= NISnorm[:mk]) * \
@@ -350,7 +367,7 @@ def main():
         plt.show()
         
 
-def get_gps_nis_3d(
+def get_gps_nis(
     pos_hat: np.ndarray, P_hat: np.ndarray, 
     pos_gps: np.ndarray, R_gps: np.ndarray, 
     sensorOffset: np.ndarray
