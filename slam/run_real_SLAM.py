@@ -115,14 +115,14 @@ def main():
     CorrCoeff = np.array([[1, 0, 0], [0, 1, 0.9], [0, 0.9, 1]])
     
     # Initial
-    sigmas = 0.025 * np.array([1e-4, 5e-5, 6 * np.pi / 180])
-    R = np.diag([0.1, 1 * np.pi / 180]) ** 2  
-    JCBBalphas = np.array([1e-5, 1e-6])
+    # sigmas = 0.025 * np.array([1e-4, 5e-5, 6 * np.pi / 180])
+    # R = np.diag([0.1, 1 * np.pi / 180]) ** 2  
+    # JCBBalphas = np.array([1e-5, 1e-6])
 
     # Good track
-    # sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
-    # R = np.diag([1, 2 * np.pi / 180]) ** 2  
-    # JCBBalphas = np.array([1e-5, 1e-6])
+    sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
+    R = np.diag([1, 2 * np.pi / 180]) ** 2  
+    JCBBalphas = np.array([1e-5, 1e-6])
     
     # sigmas = 0.025 * np.array([1e-3, 1e-4, 7 * np.pi / 180])
     # R = np.diag([0.1, 1 * np.pi / 180]) ** 2  
@@ -134,11 +134,12 @@ def main():
     # JCBBalphas = np.array([5e-4, 5e-5])
     
     R_gps = np.diag([3, 3]) ** 2
-    P = np.zeros((3, 3))
-    # stds = np.diag([3, 3, 1 * np.pi / 180])
-    # P = stds @ CorrCoeff @ stds
+    # P = np.zeros((3, 3))
+    stds = np.diag([3, 3, 1 * np.pi / 180])
+    P = stds @ CorrCoeff @ stds
+    # P = stds**2
     
-    N = K
+    N = 1000
     
     Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
     # Initialize state
@@ -147,7 +148,7 @@ def main():
     
     doPlot = False
     do_raw_prediction = False
-    showPlots = True
+    showPlots = False
 
     sensorOffset = np.array([car.a + car.L, car.b])
     doAsso = True
@@ -169,6 +170,7 @@ def main():
     gps_nis = np.zeros((Kgps,1))
     pos_err = np.zeros((Kgps,1))
     gps_ind = 0
+    initial_lmks_pos = []
 
     xupd[0] = eta
 
@@ -211,7 +213,10 @@ def main():
             eta, P =  slam.predict(eta, P, odo)
 
             z = detectTrees(LASER[mk])
-            eta, P, NIS[mk], a[mk] =  slam.update(eta, P, z)
+            eta, P, NIS[mk], a[mk] =  slam.update(eta, P, z, initial_lmks_pos)
+            
+            if len(eta) > (len(initial_lmks_pos) + 3):
+                initial_lmks_pos = np.hstack((initial_lmks_pos, eta[len(initial_lmks_pos)+3:]))
 
             num_asso = np.count_nonzero(a[mk] > -1)
             num_assos[mk] = num_asso
@@ -263,6 +268,13 @@ def main():
             odo = odometry(speed[k + 1], steering[k + 1], dt, car)
             eta, P = slam.predict(eta, P, odo)
             
+
+    stds = np.sqrt(np.diag(P))
+    avg_lmk_std = stds[3:].mean()
+    pose_std = stds[:3]
+    pose_std[2] = pose_std[2]*180/np.pi
+    print("Pose stds: ", pose_std)
+    print("Average landmark std: ", avg_lmk_std, "\nMax: ", stds[3:].max(), "\nMin: ", stds[3:].min())
 
     # %% Consistency
     
