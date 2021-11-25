@@ -418,7 +418,7 @@ class EKFSLAM:
             pass
 
     def update(
-        self, eta: np.ndarray, P: np.ndarray, z: np.ndarray
+        self, eta: np.ndarray, P: np.ndarray, z: np.ndarray, init_lmks = []
     ) -> Tuple[np.ndarray, np.ndarray, float, np.ndarray]:
         """Update eta and P with z, associating landmarks and adding new ones.
 
@@ -430,6 +430,8 @@ class EKFSLAM:
             [description]
         z : np.ndarray, shape=(#detections, 2)
             [description]
+        init_lmks : np.ndarray, shape=(2*#landmarks,)
+                    first ever estimate of lmks in eta
 
         Returns
         -------
@@ -441,10 +443,16 @@ class EKFSLAM:
         numLmk = (eta.size - 3) // 2
         assert (len(eta) - 3) % 2 == 0, "EKFSLAM.update: landmark lenght not even"
         
+        
         if numLmk > 0:
             # Prediction and innovation covariance
             zpred = self.h(eta)
-            H = self.h_jac(eta)
+            
+            if len(init_lmks):
+                assert len(init_lmks) == (len(eta) - 3)
+                H = self.h_jac(np.hstack((eta[:3], init_lmks)))
+            else:
+                H = self.h_jac(eta)
 
             # Here you can use simply np.kron (a bit slow) to form the big (very big in VP after a while) R,
             # or be smart with indexing and broadcasting (3d indexing into 2d mat) realizing you are adding the same R on all diagonals
