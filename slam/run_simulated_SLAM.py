@@ -1,5 +1,6 @@
 # %% Imports
 from plotting import ellipse
+from extras import lmk_NEES
 from EKFSLAM import EKFSLAM
 from typing import List, Optional
 
@@ -10,7 +11,6 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from scipy.stats import chi2
-from scipy.spatial import distance
 import utils
 from pathlib import Path
 
@@ -400,44 +400,6 @@ def main():
 
     plt.show()
     # %%
-
-def lmk_NEES(
-    lmk_hat: np.ndarray, P_hat_lmk: np.ndarray, lmk_gt: np.ndarray
-) -> float:
-    '''
-    Calculates NEES of landmarks. Estimated lmks are assigned to nearest true lmk, using 
-    Mahalanobis distance. So multiple estimates may be assigned to the same true one.
-    Reassociates estimates and true lmks each time as estimates may move over time.
-    Is perhaps not needed, if so one only needs to perform association on new landmarks.
-    '''
-    
-    assert lmk_hat.size == lmk_hat.shape[0]
-    assert lmk_hat.size % 2 == 0
-    assert lmk_hat.shape * 2 == P_hat_lmk.shape
-    
-    num_lmk_gt = lmk_gt.shape[0]
-    num_lmk_hat = lmk_hat.size // 2
-    lmk_hat = lmk_hat.reshape(num_lmk_hat,2)
-    dists = np.zeros((num_lmk_gt,1))
-    error = np.zeros_like(lmk_hat)
-
-    
-    # Find the closest true landmark to each estimate and assume they are associated
-    for i in range (num_lmk_hat):
-        inds = slice(2*i, 2*i + 2)
-        Pi_inv = np.linalg.inv(P_hat_lmk[inds,inds])
-        
-        for k in range (num_lmk_gt):
-            dists[k] = distance.mahalanobis(lmk_hat[i], lmk_gt[k], Pi_inv)
-        
-        idx_closest = (np.abs(dists - 2)).argmin()
-        error[i] = lmk_hat[i] - lmk_gt[idx_closest]
-    
-   
-    error = error.ravel()
-    NEES = error @ (np.linalg.solve(P_hat_lmk, error))
-    
-    return NEES
 
 if __name__ == "__main__":
     main()

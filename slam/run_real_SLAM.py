@@ -22,6 +22,7 @@ from matplotlib import animation
 from plotting import ellipse
 from vp_utils import detectTrees, odometry, Car
 from utils import rotmat2d
+from extras import get_gps_nis
 
 # %% plot config check and style setup
 
@@ -139,7 +140,7 @@ def main():
     P = stds @ CorrCoeff @ stds
     # P = stds**2
     
-    N = K
+    N = 1000
     
     Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
     # Initialize state
@@ -211,11 +212,11 @@ def main():
             # ? reset time to this laser time for next post predict
             t = timeLsr[mk]
             odo = odometry(speed[k + 1], steering[k + 1], dt, car)
-            eta, P =  slam.predict(eta, P, odo, prev_x_pred)                      # TODO comment
+            eta, P =  slam.predict(eta, P, odo)                    # To use FEJ-EKF use prev_x_pred as optional argument
             prev_x_pred = eta[:3]
 
             z = detectTrees(LASER[mk])
-            eta, P, NIS[mk], a[mk] =  slam.update(eta, P, z, initial_lmks_pos)
+            eta, P, NIS[mk], a[mk] =  slam.update(eta, P, z)  # To use FEJ-EKF use initial_lmks_pos as optional argument
             
             if len(eta) > (len(initial_lmks_pos) + 3):
                 initial_lmks_pos = np.hstack((initial_lmks_pos, eta[len(initial_lmks_pos)+3:]))
@@ -268,7 +269,7 @@ def main():
             dt = timeOdo[k + 1] - t
             t = timeOdo[k + 1]
             odo = odometry(speed[k + 1], steering[k + 1], dt, car)
-            eta, P = slam.predict(eta, P, odo, prev_x_pred)
+            eta, P = slam.predict(eta, P, odo)                                  # To use FEJ-EKF use prev_x_pred as optional argument TODO make use fej bool
             prev_x_pred = eta[:3]
             
 
@@ -276,8 +277,9 @@ def main():
     avg_lmk_std = stds[3:].mean()
     pose_std = stds[:3]
     pose_std[2] = pose_std[2]*180/np.pi
-    print("Pose stds: ", pose_std)
-    print("Average landmark std: ", avg_lmk_std, "\nMax: ", stds[3:].max(), "\nMin: ", stds[3:].min())
+    print("Final pose stds: ", pose_std)
+    print("Final pose cov:\n", P[:3,:3])
+    print("Average final landmark std: ", avg_lmk_std, "\nMax final: ", stds[3:].max(), "\nMin final: ", stds[3:].min())
 
     # %% Consistency
     
@@ -380,29 +382,6 @@ def main():
     
     if showPlots:
         plt.show()
-        
-
-def get_gps_nis(
-    pos_hat: np.ndarray, P_hat: np.ndarray, 
-    pos_gps: np.ndarray, R_gps: np.ndarray, 
-    sensorOffset: np.ndarray
-) -> float:
-    
-    assert pos_hat.size == 3
-    assert pos_hat.shape * 2 == P_hat.shape
-    assert pos_gps.size == 2
-    assert pos_gps.shape * 2 == R_gps.shape  
-    
-    innovation = pos_hat[:2] - pos_gps
-    a = pos_hat[2]
-    drotmat_dangle = - np.array([[ np.sin(a), np.cos(a)],
-                                 [-np.cos(a), np.sin(a)]])
-    H = np.eye(2,3)
-    H[:,2] = drotmat_dangle @ sensorOffset
-    S = H @ P_hat @ H.T + R_gps
-    
-    NIS = innovation @ (np.linalg.solve(S, innovation))
-    return NIS
 
 if __name__ == "__main__":
     main()
