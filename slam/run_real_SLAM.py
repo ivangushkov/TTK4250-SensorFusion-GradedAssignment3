@@ -150,6 +150,7 @@ def main():
     doPlot = False
     do_raw_prediction = False
     showPlots = True
+    useFEJ = False      # Use First Estimate Jacobian EKF for handling concistency issues. Not working.
 
     sensorOffset = np.array([car.a + car.L, car.b])
     doAsso = True
@@ -212,15 +213,20 @@ def main():
             # ? reset time to this laser time for next post predict
             t = timeLsr[mk]
             odo = odometry(speed[k + 1], steering[k + 1], dt, car)
-            eta, P =  slam.predict(eta, P, odo)                    # To use FEJ-EKF use prev_x_pred as optional argument
-            prev_x_pred = eta[:3]
+            if useFEJ:
+                eta, P =  slam.predict(eta, P, odo, prev_x_pred)
+                prev_x_pred = eta[:3]
+            else:
+                eta, P =  slam.predict(eta, P, odo)
 
             z = detectTrees(LASER[mk])
-            eta, P, NIS[mk], a[mk] =  slam.update(eta, P, z)  # To use FEJ-EKF use initial_lmks_pos as optional argument
-            
-            if len(eta) > (len(initial_lmks_pos) + 3):
-                initial_lmks_pos = np.hstack((initial_lmks_pos, eta[len(initial_lmks_pos)+3:]))
-
+            if useFEJ:
+                eta, P, NIS[mk], a[mk] =  slam.update(eta, P, z, initial_lmks_pos) 
+                if len(eta) > (len(initial_lmks_pos) + 3):
+                    initial_lmks_pos = np.hstack((initial_lmks_pos, eta[len(initial_lmks_pos)+3:]))
+            else:
+                eta, P, NIS[mk], a[mk] =  slam.update(eta, P, z)
+                
             num_asso = np.count_nonzero(a[mk] > -1)
             num_assos[mk] = num_asso
 
@@ -269,8 +275,11 @@ def main():
             dt = timeOdo[k + 1] - t
             t = timeOdo[k + 1]
             odo = odometry(speed[k + 1], steering[k + 1], dt, car)
-            eta, P = slam.predict(eta, P, odo)                                  # To use FEJ-EKF use prev_x_pred as optional argument TODO make use fej bool
-            prev_x_pred = eta[:3]
+            if useFEJ:
+                eta, P = slam.predict(eta, P, odo, prev_x_pred)                                  
+                prev_x_pred = eta[:3]
+            else:
+                eta, P = slam.predict(eta, P, odo)
             
 
     stds = np.sqrt(np.diag(P))
