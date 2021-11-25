@@ -130,9 +130,9 @@ class EKFSLAM:
         etapred[3:] = eta[3:]
 
         if len(prev_x_pred):
-            x_mod = np.hstack((prev_x_pred, eta[3:]))
-            Fx = self.Fx(x_mod, z_odo)
-            Fu = self.Fu(x_mod, z_odo)
+            assert len(prev_x_pred) == 3
+            Fx = self.Fx(prev_x_pred, z_odo)
+            Fu = self.Fu(prev_x_pred, z_odo)
         else:
             Fx = self.Fx(x, z_odo)
             Fu = self.Fu(x, z_odo)
