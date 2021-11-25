@@ -139,7 +139,7 @@ def main():
     P = stds @ CorrCoeff @ stds
     # P = stds**2
     
-    N = 1000
+    N = K
     
     Q = np.diag(sigmas) @ CorrCoeff @ np.diag(sigmas)
     # Initialize state
@@ -148,7 +148,7 @@ def main():
     
     doPlot = False
     do_raw_prediction = False
-    showPlots = False
+    showPlots = True
 
     sensorOffset = np.array([car.a + car.L, car.b])
     doAsso = True
@@ -173,6 +173,7 @@ def main():
     initial_lmks_pos = []
 
     xupd[0] = eta
+    prev_x_pred = eta
 
     mk_first = 1  # first seems to be a bit off in timing
     mk = mk_first
@@ -210,7 +211,8 @@ def main():
             # ? reset time to this laser time for next post predict
             t = timeLsr[mk]
             odo = odometry(speed[k + 1], steering[k + 1], dt, car)
-            eta, P =  slam.predict(eta, P, odo)
+            eta, P =  slam.predict(eta, P, odo, prev_x_pred)                      # TODO comment
+            prev_x_pred = eta[:3]
 
             z = detectTrees(LASER[mk])
             eta, P, NIS[mk], a[mk] =  slam.update(eta, P, z, initial_lmks_pos)
@@ -266,7 +268,8 @@ def main():
             dt = timeOdo[k + 1] - t
             t = timeOdo[k + 1]
             odo = odometry(speed[k + 1], steering[k + 1], dt, car)
-            eta, P = slam.predict(eta, P, odo)
+            eta, P = slam.predict(eta, P, odo, prev_x_pred)
+            prev_x_pred = eta[:3]
             
 
     stds = np.sqrt(np.diag(P))

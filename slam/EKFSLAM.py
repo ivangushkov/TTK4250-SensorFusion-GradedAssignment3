@@ -92,7 +92,7 @@ class EKFSLAM:
         return Fu
 
     def predict(
-        self, eta: np.ndarray, P: np.ndarray, z_odo: np.ndarray
+        self, eta: np.ndarray, P: np.ndarray, z_odo: np.ndarray, prev_x_pred = []
     ) -> Tuple[np.ndarray, np.ndarray]:
         """Predict the robot state using the zOdo as odometry the corresponding state&map covariance.
 
@@ -104,6 +104,9 @@ class EKFSLAM:
             the covariance of eta
         z_odo : np.ndarray, shape=(3,)
             the measured odometry
+        prev_x_pred : np.ndarray, shape=(3,)
+            last predicted robot pose, not last updated
+            Optional, for countering concistency issues, but may increase error
 
         Returns
         -------
@@ -126,8 +129,13 @@ class EKFSLAM:
         etapred[:3] = self.f(x, z_odo)
         etapred[3:] = eta[3:]
 
-        Fx = self.Fx(x, z_odo)
-        Fu = self.Fu(x, z_odo)
+        if len(prev_x_pred):
+            x_mod = np.hstack((prev_x_pred, eta[3:]))
+            Fx = self.Fx(x_mod, z_odo)
+            Fu = self.Fu(x_mod, z_odo)
+        else:
+            Fx = self.Fx(x, z_odo)
+            Fu = self.Fu(x, z_odo)
 
         # evaluate covariance prediction in place to save computation
         # only robot state changes, so only rows and colums of robot state needs changing
@@ -431,7 +439,8 @@ class EKFSLAM:
         z : np.ndarray, shape=(#detections, 2)
             [description]
         init_lmks : np.ndarray, shape=(2*#landmarks,)
-                    first ever estimate of lmks in eta
+                    First ever estimate of lmks in eta
+                    Optional, for countering concistency issues, but may increase error
 
         Returns
         -------
