@@ -104,14 +104,14 @@ def main():
     # JCBBalphas = np.array([0.001, 0.0001]) 
     
     # Bad map, good tracking
-    # Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2 
-    # R = np.diag([1, 5 * np.pi / 180]) ** 2 
-    # JCBBalphas = np.array([0.00001, 0.0000001])
+    Q = np.diag([0.1, 0.1, 1 * np.pi / 180]) ** 2 
+    R = np.diag([1, 5 * np.pi / 180]) ** 2 
+    JCBBalphas = np.array([0.00001, 0.0000001])
 
     # Good params
-    Q = np.diag([0.09, 0.09, 0.6 * np.pi / 180]) ** 2 
-    R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2 
-    JCBBalphas = np.array([1e-4, 1e-5])     
+    # Q = np.diag([0.09, 0.09, 0.6 * np.pi / 180]) ** 2 
+    # R = np.diag([0.08, 0.8 * np.pi / 180]) ** 2 
+    # JCBBalphas = np.array([1e-4, 1e-5])     
     # to remove the 2 extra landmarks, use alpha_2 = 2e-6, other tuning uses 1e-5
     
     # Diverging
@@ -196,10 +196,10 @@ def main():
             NISnorm[k] = 1
             CInorm[k].fill(1)
 
-        NEESes[k] = slam.NEESes(eta_hat[k][:3], P_hat[k][:3,:3], poseGT[k]) # TODO why not look at nees for landmarks?
+        NEESes[k] = slam.NEESes(eta_hat[k][:3], P_hat[k][:3,:3], poseGT[k])
 
         num_lmks[k] = (len(eta_hat[k]) - 3) // 2
-        if num_lmks[k] > 0 and calculate_map_NEES: # Not needed in this case, but looks good
+        if num_lmks[k] > 0 and calculate_map_NEES:
             NEES_map[k] = lmk_NEES(eta_hat[k][3:], P_hat[k][3:,3:], landmarks)
             NEESnorm_map[k] = NEES_map[k] / num_lmks[k]
             CI_NEES_map[k] = chi2.interval(alpha, 2 * num_lmks[k])

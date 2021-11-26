@@ -23,7 +23,9 @@ def lmk_NEES(
     error = np.zeros_like(lmk_hat)
 
     
-    # Find the closest true landmark to each estimate and assume they are associated
+    # Find the closest true landmark to each estimate using 
+    # Mahalonobis distance and assume they are associated
+    # i.e. choose associations s.t. individual lmk NEES is minimized
     for i in range (num_lmk_hat):
         inds = slice(2*i, 2*i + 2)
         Pi_inv = np.linalg.inv(P_hat_lmk[inds,inds])

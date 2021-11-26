@@ -137,8 +137,8 @@ def main():
     R_gps = np.diag([3, 3]) ** 2
     # P = np.zeros((3, 3))
     stds = np.diag([3, 3, 1 * np.pi / 180])
-    P = stds @ CorrCoeff @ stds
-    # P = stds**2
+    # P = stds @ CorrCoeff @ stds
+    P = stds**2
     
     N = 1000
     
@@ -213,6 +213,7 @@ def main():
             # ? reset time to this laser time for next post predict
             t = timeLsr[mk]
             odo = odometry(speed[k + 1], steering[k + 1], dt, car)
+            
             if useFEJ:
                 eta, P =  slam.predict(eta, P, odo, prev_x_pred)
                 prev_x_pred = eta[:3]
@@ -220,8 +221,11 @@ def main():
                 eta, P =  slam.predict(eta, P, odo)
 
             z = detectTrees(LASER[mk])
+            
             if useFEJ:
                 eta, P, NIS[mk], a[mk] =  slam.update(eta, P, z, initial_lmks_pos) 
+                
+                # Check for new landmarks
                 if len(eta) > (len(initial_lmks_pos) + 3):
                     initial_lmks_pos = np.hstack((initial_lmks_pos, eta[len(initial_lmks_pos)+3:]))
             else:
@@ -292,7 +296,7 @@ def main():
 
     # %% Consistency
     
-    # GPS NIS
+    # GPS Comparison
     gps_CI = np.tile(chi2.interval(confidence_prob, 2), (gps_ind,1))
     gps_insideCI = (gps_CI[:,0] <= gps_nis[:gps_ind]) * \
         (gps_nis[:gps_ind] <= gps_CI[:,1])
@@ -313,8 +317,12 @@ def main():
     ax2[1].set_xlabel("GPS measurements")
     
     if gps_ind > 3400:              # Due to one wierd measurement
-        ax2[1].set_ylim((-2, 18))
-        ax2[0].set_ylim((-2, 18))
+        if useFEJ:
+            ax2[1].set_ylim((-20, 150))
+            ax2[0].set_ylim(( -5, 50))
+        else:
+            ax2[1].set_ylim((-2, 18))
+            ax2[0].set_ylim((-2, 18))
     
     fig2.canvas.manager.set_window_title("GPS Comparison")
     fig2.savefig(plot_folder.joinpath("GPS Comparison.pdf"))
